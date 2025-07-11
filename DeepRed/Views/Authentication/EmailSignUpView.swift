@@ -152,6 +152,7 @@ struct EmailSignUpView: View {
                     .padding(.bottom, DeepRedDesign.Spacing.lg)
                 }
             }
+            .dismissKeyboardOnBackgroundTap()
         }
         .fullScreenCover(isPresented: $showMainApp) {
             MainAppView()

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct NativeTabBar: View {
     @State private var selectedTab: TabItem = .home
+    @State private var showCameraView = false
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -65,9 +66,21 @@ struct NativeTabBar: View {
             // Haptic feedback on tab change
             HapticFeedback.selection()
             
-            // Special handling for record button
+            // Special handling for record button - open camera directly
             if newValue == .record {
-                HapticFeedback.impact(.medium)
+                // Open camera immediately
+                showCameraView = true
+                HapticFeedback.impact(.heavy)
+                
+                // Reset to home tab so record tab doesn't stay selected
+                DispatchQueue.main.async {
+                    selectedTab = .home
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showCameraView) {
+            CameraRecordingView(useBackCamera: false) {
+                // Camera will automatically dismiss when done
             }
         }
     }

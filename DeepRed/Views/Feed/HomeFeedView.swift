@@ -9,6 +9,7 @@ struct HomeFeedView: View {
     @State private var showNotifications = false
     @State private var refreshing = false
     @State private var scrollOffset: CGFloat = 0
+    @State private var showCameraView = false
     
     private let videos = SampleData.sampleVideos
     private let headerHeight: CGFloat = 60
@@ -42,6 +43,19 @@ struct HomeFeedView: View {
                         }
                     )
                 }
+                
+                // Floating Record Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        FloatingRecordButton {
+                            showCameraView = true
+                        }
+                        .padding(.trailing, DeepRedDesign.Spacing.screenMargin)
+                        .padding(.bottom, DeepRedDesign.Spacing.screenMargin) // Seamless positioning above tab bar
+                    }
+                }
             }
         }
         .sheet(isPresented: $showSearch) {
@@ -49,6 +63,11 @@ struct HomeFeedView: View {
         }
         .sheet(isPresented: $showNotifications) {
             NotificationsView()
+        }
+        .fullScreenCover(isPresented: $showCameraView) {
+            CameraRecordingView(useBackCamera: false) {
+                // Camera will automatically dismiss when done
+            }
         }
         .environmentObject(appState)
     }
@@ -390,6 +409,7 @@ struct SearchView: View {
                 .primaryBackground()
             }
             .primaryBackground()
+            .dismissKeyboardOnBackgroundTap()
         }
         .presentationDragIndicator(.visible)
     }

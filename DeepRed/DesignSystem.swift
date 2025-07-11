@@ -158,4 +158,29 @@ extension View {
     func screenPadding() -> some View {
         self.padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
     }
+}
+
+// MARK: - Keyboard Dismissal
+extension View {
+    /// Adds a tap gesture to dismiss the keyboard when tapping anywhere on the view
+    func dismissKeyboardOnTap() -> some View {
+        self.onTapGesture {
+            hideKeyboard()
+        }
+    }
+    
+    /// Adds keyboard dismissal to a container view without interfering with child interactions
+    func dismissKeyboardOnBackgroundTap() -> some View {
+        self.simultaneousGesture(
+            TapGesture()
+                .onEnded { _ in
+                    hideKeyboard()
+                }
+        )
+    }
+    
+    /// Hide keyboard helper function
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 } 

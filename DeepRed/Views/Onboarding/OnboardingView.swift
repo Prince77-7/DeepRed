@@ -14,6 +14,8 @@ struct OnboardingPage {
 struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var showAuthView = false
+    @State private var showMainApp = false
+    @StateObject private var appState = AppStateManager()
     
     private let pages: [OnboardingPage] = [
         OnboardingPage(
@@ -42,7 +44,7 @@ struct OnboardingView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Logo
+                // Logo and Testing Button
                 HStack {
                     Image("logo")
                         .resizable()
@@ -50,6 +52,25 @@ struct OnboardingView: View {
                         .frame(height: 40)
                     
                     Spacer()
+                    
+                    // Testing Button - For Development Only
+                    Button(action: {
+                        // Login with demo credentials
+                        if appState.signIn(email: "demo@deepred.com", password: "password123") {
+                            HapticFeedback.notification(.success)
+                            showMainApp = true
+                        }
+                    }) {
+                        Text("TEST LOGIN")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(DeepRedDesign.Colors.accent)
+                            )
+                    }
                 }
                 .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
                 .padding(.top, DeepRedDesign.Spacing.md)
@@ -114,6 +135,9 @@ struct OnboardingView: View {
         }
         .fullScreenCover(isPresented: $showAuthView) {
             AuthenticationHubView()
+        }
+        .fullScreenCover(isPresented: $showMainApp) {
+            MainAppView()
         }
     }
 }

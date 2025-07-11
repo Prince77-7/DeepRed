@@ -173,6 +173,51 @@ struct RecordButton: View {
     }
 }
 
+// MARK: - Floating Record Button
+
+struct FloatingRecordButton: View {
+    let action: () -> Void
+    @State private var isPressed = false
+    @State private var pulseAnimation = false
+    
+    var body: some View {
+        Button(action: {
+            HapticFeedback.impact(.heavy)
+            action()
+        }) {
+            ZStack {
+                // Shadow background
+                Circle()
+                    .fill(DeepRedDesign.Colors.accent)
+                    .frame(width: 64, height: 64)
+                    .shadow(
+                        color: DeepRedDesign.Colors.accent.opacity(0.3),
+                        radius: 16,
+                        x: 0,
+                        y: 8
+                    )
+                    .scaleEffect(isPressed ? 0.95 : 1.0)
+                    .scaleEffect(pulseAnimation ? 1.05 : 1.0)
+                
+                // Record icon
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(DeepRedDesign.Colors.snow)
+                    .rotationEffect(.degrees(isPressed ? 45 : 0))
+            }
+        }
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .animation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true), value: pulseAnimation)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {})
+        .onAppear {
+            pulseAnimation = true
+        }
+    }
+}
+
 // MARK: - Haptic Feedback Helper
 
 struct HapticFeedback {

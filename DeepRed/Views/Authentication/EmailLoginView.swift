@@ -141,6 +141,7 @@ struct EmailLoginView: View {
                     }
                 }
             }
+            .dismissKeyboardOnBackgroundTap()
         }
         .fullScreenCover(isPresented: $showMainApp) {
             MainAppView()
@@ -301,6 +302,7 @@ struct ForgotPasswordView: View {
                     }
                 }
             }
+            .dismissKeyboardOnBackgroundTap()
         }
         .onChange(of: email) { _, _ in validateEmail() }
     }
