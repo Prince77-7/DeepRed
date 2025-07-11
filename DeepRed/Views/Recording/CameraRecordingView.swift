@@ -16,6 +16,10 @@ struct CameraRecordingView: View {
     @State private var showPostView = false
     @State private var recordedVideoURL: URL?
     
+    // Recording components
+    @StateObject private var cameraManager = CameraManager()
+    @State private var recordingTimer: Timer?
+    
     private let maxRecordingTime: TimeInterval = 30.0
     
     var body: some View {
@@ -25,7 +29,7 @@ struct CameraRecordingView: View {
                 .ignoresSafeArea()
             
             // Camera Preview
-            CameraPreviewView(cameraPosition: currentCamera)
+            CameraPreviewUIView(cameraManager: cameraManager)
                 .ignoresSafeArea()
                 .onTapGesture(count: 2) {
                     // Double tap to switch camera
@@ -43,6 +47,7 @@ struct CameraRecordingView: View {
                     // Close Button
                     Button(action: {
                         stopRecording()
+                        cameraManager.stopCameraSession()
                         dismiss()
                     }) {
                         Image(systemName: "xmark")
@@ -124,6 +129,9 @@ struct CameraRecordingView: View {
         .onAppear {
             setupCamera()
         }
+        .onDisappear {
+            cameraManager.cleanup()
+        }
         .fullScreenCover(isPresented: $showPostView, onDismiss: {
             dismiss()
         }) {
@@ -133,29 +141,58 @@ struct CameraRecordingView: View {
                 }
             }
         }
+        .onChange(of: cameraManager.recordedVideoURL) { _, newURL in
+            if let url = newURL {
+                print("🎥 Received recorded video URL: \(url)")
+                print("📱 Stopping camera for preview...")
+                
+                // Stop camera immediately when recording completes
+                cameraManager.stopCameraSession()
+                
+                recordedVideoURL = url
+                showPostView = true
+                print("✅ showPostView set to true")
+            }
+        }
+        .onChange(of: cameraManager.isSessionRunning) { _, isRunning in
+            print("📹 Camera session running state changed: \(isRunning)")
+        }
     }
     
     // MARK: - Private Methods
     
     private func setupCamera() {
+        print("🎬 Setting up camera...")
         currentCamera = useBackCamera ? .back : .front
+        cameraManager.setupCamera(position: currentCamera)
         HapticFeedback.impact(.light)
     }
     
     private func switchCamera() {
+        print("🔄 Switching camera...")
         currentCamera = currentCamera == .front ? .back : .front
+        cameraManager.switchCamera(to: currentCamera)
         HapticFeedback.impact(.medium)
     }
     
     private func startRecording() {
+        print("🎬 Starting recording...")
+        
         isRecording = true
         recordingDuration = 0
         recordingProgress = 0
         
+        // Create output URL
+        let outputURL = createVideoURL()
+        print("📁 Recording to: \(outputURL.absoluteString)")
+        
+        // Start recording
+        cameraManager.startRecording(to: outputURL)
+        
         HapticFeedback.notification(.success)
         
         // Start recording timer
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
             if isRecording {
                 recordingDuration += 0.1
                 recordingProgress = recordingDuration / maxRecordingTime
@@ -177,16 +214,16 @@ struct CameraRecordingView: View {
     }
     
     private func finishRecording() {
+        print("🛑 Finishing recording...")
         isRecording = false
-        HapticFeedback.notification(.success)
+        recordingTimer?.invalidate()
+        recordingTimer = nil
         
-        // Simulate saving video
-        recordedVideoURL = createDummyVideoURL()
-        showPostView = true
+        cameraManager.stopRecording()
+        HapticFeedback.notification(.success)
     }
     
-    private func createDummyVideoURL() -> URL {
-        // Create a dummy URL for the recorded video
+    private func createVideoURL() -> URL {
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return documentsPath.appendingPathComponent("recorded_video_\(Date().timeIntervalSince1970).mp4")
     }
@@ -197,6 +234,280 @@ struct CameraRecordingView: View {
         formatter.unitsStyle = .positional
         formatter.zeroFormattingBehavior = .pad
         return formatter.string(from: timeInterval) ?? "0:00"
+    }
+}
+
+// MARK: - Camera Manager
+
+class CameraManager: ObservableObject {
+    private var captureSession: AVCaptureSession?
+    private var videoOutput: AVCaptureMovieFileOutput?
+    private var currentPosition: CameraPosition = .front
+    private var recordingDelegate: VideoRecordingDelegate?
+    
+    @Published var recordedVideoURL: URL?
+    @Published var isSessionRunning = false
+    @Published var cameraPosition: CameraPosition = .front
+    
+    func setupCamera(position: CameraPosition) {
+        print("📹 Setting up camera session for position: \(position)")
+        
+        // Set not running immediately
+        isSessionRunning = false
+        
+        // Stop existing session
+        captureSession?.stopRunning()
+        
+        currentPosition = position
+        
+        let session = AVCaptureSession()
+        
+        // Configure session on background thread
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            session.beginConfiguration()
+            session.sessionPreset = .high
+            
+            // Remove existing inputs
+            session.inputs.forEach { input in
+                session.removeInput(input)
+            }
+            
+            // Remove existing outputs
+            session.outputs.forEach { output in
+                session.removeOutput(output)
+            }
+            
+            guard let captureDevice = AVCaptureDevice.default(
+                .builtInWideAngleCamera,
+                for: .video,
+                position: position == .front ? .front : .back
+            ) else { 
+                print("❌ Could not get capture device")
+                return 
+            }
+            
+            guard let videoInput = try? AVCaptureDeviceInput(device: captureDevice) else { 
+                print("❌ Could not create video input")
+                return 
+            }
+            
+            if session.canAddInput(videoInput) {
+                session.addInput(videoInput)
+                print("✅ Added video input")
+            }
+            
+            // Add audio input
+            guard let audioDevice = AVCaptureDevice.default(for: .audio) else { 
+                print("❌ Could not get audio device")
+                return 
+            }
+            
+            guard let audioInput = try? AVCaptureDeviceInput(device: audioDevice) else { 
+                print("❌ Could not create audio input")
+                return 
+            }
+            
+            if session.canAddInput(audioInput) {
+                session.addInput(audioInput)
+                print("✅ Added audio input")
+            }
+            
+            // Setup movie file output
+            let movieOutput = AVCaptureMovieFileOutput()
+            if session.canAddOutput(movieOutput) {
+                session.addOutput(movieOutput)
+                print("✅ Added movie output")
+                
+                // Configure video mirroring for front camera
+                if let videoConnection = movieOutput.connection(with: .video) {
+                    if position == .front {
+                        videoConnection.automaticallyAdjustsVideoMirroring = false
+                        videoConnection.isVideoMirrored = true
+                        print("🪞 Front camera video output mirrored")
+                    } else {
+                        videoConnection.automaticallyAdjustsVideoMirroring = false
+                        videoConnection.isVideoMirrored = false
+                        print("📹 Back camera video output normal")
+                    }
+                }
+            }
+            
+            session.commitConfiguration()
+            
+            DispatchQueue.main.async {
+                self?.captureSession = session
+                self?.videoOutput = movieOutput
+                self?.currentPosition = position
+                self?.cameraPosition = position
+            }
+            
+            // Start session
+            session.startRunning()
+            
+            DispatchQueue.main.async {
+                self?.isSessionRunning = session.isRunning
+                print("✅ Camera session started: \(session.isRunning)")
+            }
+        }
+    }
+    
+    func switchCamera(to position: CameraPosition) {
+        print("🔄 Switching camera to: \(position)")
+        setupCamera(position: position)
+    }
+    
+    func startRecording(to url: URL) {
+        print("🎬 Starting recording to: \(url)")
+        
+        recordingDelegate = VideoRecordingDelegate { [weak self] recordedURL, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ Recording failed: \(error)")
+                    return
+                }
+                
+                guard let recordedURL = recordedURL else {
+                    print("❌ No URL provided for recorded video")
+                    return
+                }
+                
+                print("✅ Recording completed successfully! URL: \(recordedURL)")
+                self?.recordedVideoURL = recordedURL
+            }
+        }
+        
+        videoOutput?.startRecording(to: url, recordingDelegate: recordingDelegate!)
+        print("✅ Recording started")
+    }
+    
+    func stopRecording() {
+        print("🛑 Stopping recording...")
+        videoOutput?.stopRecording()
+    }
+    
+    func stopCameraSession() {
+        print("📹 Stopping camera session...")
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            self?.captureSession?.stopRunning()
+            DispatchQueue.main.async {
+                self?.isSessionRunning = false
+                print("✅ Camera session stopped")
+            }
+        }
+    }
+    
+    func getSession() -> AVCaptureSession? {
+        return captureSession
+    }
+    
+    func getCurrentPosition() -> CameraPosition {
+        return currentPosition
+    }
+    
+    func cleanup() {
+        print("🧹 Cleaning up camera session...")
+        captureSession?.stopRunning()
+        captureSession = nil
+        videoOutput = nil
+        recordingDelegate = nil
+    }
+}
+
+// MARK: - Camera Preview UIView
+
+struct CameraPreviewUIView: UIViewRepresentable {
+    @ObservedObject var cameraManager: CameraManager
+    
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .black
+        context.coordinator.parentView = view
+        
+        // Set up preview layer immediately if session is available
+        if let session = cameraManager.getSession(), cameraManager.isSessionRunning {
+            context.coordinator.setupPreviewLayerOnce(with: session, in: view)
+            context.coordinator.updatePreviewMirroring(for: cameraManager.getCurrentPosition())
+        }
+        
+        return view
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {
+        // Only set up if we haven't already and session is running
+        if context.coordinator.previewLayer == nil,
+           let session = cameraManager.getSession(),
+           cameraManager.isSessionRunning {
+            context.coordinator.setupPreviewLayerOnce(with: session, in: uiView)
+            context.coordinator.updatePreviewMirroring(for: cameraManager.getCurrentPosition())
+        }
+        
+        // Update frame if preview layer exists
+        if let previewLayer = context.coordinator.previewLayer {
+            previewLayer.frame = uiView.bounds
+        }
+        
+        // Update mirroring when camera position changes
+        context.coordinator.updatePreviewMirroring(for: cameraManager.getCurrentPosition())
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator: NSObject {
+        var previewLayer: AVCaptureVideoPreviewLayer?
+        var parentView: UIView?
+        
+        func setupPreviewLayerOnce(with session: AVCaptureSession, in view: UIView) {
+            // Only create if we don't already have one
+            guard previewLayer == nil else { return }
+            
+            print("📹 Setting up preview layer...")
+            
+            let newPreviewLayer = AVCaptureVideoPreviewLayer(session: session)
+            newPreviewLayer.frame = view.bounds
+            newPreviewLayer.videoGravity = .resizeAspectFill
+            
+            view.layer.addSublayer(newPreviewLayer)
+            self.previewLayer = newPreviewLayer
+            
+            print("✅ Preview layer setup complete")
+        }
+        
+        func updatePreviewMirroring(for position: CameraPosition) {
+            guard let previewLayer = previewLayer else { return }
+            
+            // Mirror the preview for front camera (like a mirror)
+            if position == .front {
+                previewLayer.connection?.automaticallyAdjustsVideoMirroring = false
+                previewLayer.connection?.isVideoMirrored = true
+                print("🪞 Front camera preview mirrored")
+            } else {
+                previewLayer.connection?.automaticallyAdjustsVideoMirroring = false
+                previewLayer.connection?.isVideoMirrored = false
+                print("📹 Back camera preview normal")
+            }
+        }
+        
+        func removePreviewLayer() {
+            previewLayer?.removeFromSuperlayer()
+            previewLayer = nil
+        }
+    }
+}
+
+// MARK: - Video Recording Delegate
+
+class VideoRecordingDelegate: NSObject, AVCaptureFileOutputRecordingDelegate {
+    private let completion: (URL?, Error?) -> Void
+    
+    init(completion: @escaping (URL?, Error?) -> Void) {
+        self.completion = completion
+    }
+    
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+        print("📹 Recording delegate called - URL: \(outputFileURL), Error: \(error?.localizedDescription ?? "none")")
+        completion(outputFileURL, error)
     }
 }
 

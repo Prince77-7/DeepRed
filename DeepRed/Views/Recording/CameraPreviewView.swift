@@ -52,6 +52,9 @@ struct RealCameraPreview: UIViewRepresentable {
             captureSession.startRunning()
         }
         
+        // Store the session for potential cleanup
+        context.coordinator.captureSession = captureSession
+        
         return view
     }
     
@@ -86,21 +89,57 @@ struct RealCameraPreview: UIViewRepresentable {
         }
     }
     
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator: NSObject {
+        var captureSession: AVCaptureSession?
+        
+        deinit {
+            captureSession?.stopRunning()
+        }
+    }
+    
     private func createFallbackView() -> UIView {
         let view = UIView()
         view.backgroundColor = .black
+        
+        let containerView = UIView()
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let iconImageView = UIImageView(image: UIImage(systemName: "camera.fill"))
+        iconImageView.tintColor = .white
+        iconImageView.contentMode = .scaleAspectFit
+        iconImageView.translatesAutoresizingMaskIntoConstraints = false
         
         let label = UILabel()
         label.text = "Camera Not Available"
         label.textColor = .white
         label.textAlignment = .center
-        label.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         
-        view.addSubview(label)
+        containerView.addSubview(iconImageView)
+        containerView.addSubview(label)
+        view.addSubview(containerView)
+        
         NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            // Container constraints
+            containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            
+            // Icon constraints
+            iconImageView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            iconImageView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            iconImageView.widthAnchor.constraint(equalToConstant: 60),
+            iconImageView.heightAnchor.constraint(equalToConstant: 60),
+            
+            // Label constraints
+            label.topAnchor.constraint(equalTo: iconImageView.bottomAnchor, constant: 16),
+            label.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            label.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
         ])
         
         return view

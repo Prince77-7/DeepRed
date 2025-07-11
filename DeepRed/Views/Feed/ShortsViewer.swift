@@ -65,7 +65,6 @@ struct ShortsViewer: View {
             }
         }
         .statusBarHidden()
-        .preferredColorScheme(.dark)
     }
     
     private func handleDismiss() {

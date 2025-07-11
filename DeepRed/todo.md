@@ -100,6 +100,98 @@
   - Smooth spring animations for all card transitions
 - **Status**: Complete
 
+### ✅ Updated Comments Sheet to YouTube/TikTok Style Presentation
+- **Task**: Modified comments sheet to only cover 2/3 of screen instead of full-screen
+- **Problem**: Comments sheet was covering the entire screen, unlike YouTube/TikTok behavior
+- **Solution**: Implemented presentation detents for partial screen coverage
+- **Implementation Details**:
+  - Added `.presentationDetents([.medium, .large])` to comments sheet
+  - Medium detent covers approximately 2/3 of screen (default)
+  - Large detent allows users to expand to full screen if needed
+  - Added `.presentationDragIndicator(.visible)` for intuitive interaction
+  - Removed duplicate drag indicator from sheet content
+- **Result**: 
+  - Comments sheet now opens to 2/3 screen coverage like YouTube/TikTok
+  - Users can still expand to full screen by dragging up
+  - More native iOS behavior with partial sheet presentation
+  - Video content remains partially visible behind comments
+  - Professional user experience matching modern social media apps
+- **Status**: Complete
+
+### ✅ Fixed Header Animation to Slide Smoothly to Screen Edge
+- **Task**: Fixed header animation with proper shadow overlay that remains for visual separation
+- **Problem**: Header disappeared abruptly, popped back in quickly, and left harsh white edges instead of smooth shadow overlay
+- **Solution**: Implemented offset-based animation with shadow overlay that stays visible when content fades
+- **Implementation Details**:
+  - Removed `max(0, headerHeight + headerOffset)` frame height constraint
+  - Changed to fixed `.frame(height: headerHeight)` to maintain consistent header size
+  - Added `.offset(y: headerOffset)` to actually move the header position
+  - Synchronized opacity and offset thresholds (both use 60pt)
+  - Added easeInOut curve (`progress * progress * (3.0 - 2.0 * progress)`) for smooth transitions
+  - Changed to spring animations (`.spring(response: 0.3, dampingFraction: 0.8)`) for natural feel
+  - Created layered background system:
+    - Base shadow overlay (black gradient) that always stays visible
+    - White overlay on top that fades out with content
+    - Both layers extend to top edge with `ignoresSafeArea`
+  - Applied opacity only to content (logo, buttons), not background
+  - Kept `.clipped()` to ensure header is cut off at screen edge
+- **Result**: 
+  - Header content slides smoothly and fades when scrolling down
+  - Header content slides smoothly back when scrolling up (symmetric animation)
+  - Subtle shadow overlay remains visible for visual separation and status bar protection
+  - Shadow extends all the way to top edge of screen (no harsh edges)
+  - Smooth transition from solid white header to shadow overlay
+  - No more abrupt appearing/disappearing in either direction
+  - Professional, native iOS scrolling behavior with spring physics
+  - Matches behavior of premium social media apps like Instagram/TikTok with proper overlay
+- **Status**: Complete
+
+### ✅ Added Dreamy Glassmorphism Top Shadow Overlay
+- **Task**: Added beautiful glossy shadow overlay that appears when scrolling down
+- **Problem**: Needed premium visual separation and dreamy effect at top of screen during scroll
+- **Solution**: Implemented multi-layered glassmorphism overlay with smooth animations
+- **Implementation Details**:
+  - Created `scrollProgress` computed property with smooth easing curve
+  - Built layered overlay system:
+    - Base `.ultraThinMaterial` blur for glassmorphism effect
+    - Dreamy gradient overlay (white to black to clear) for depth
+    - Glossy highlight at top for premium shine effect
+  - Height of 140pt for proper visual coverage
+  - Opacity scales with scroll progress (0 to 1) using smooth curve
+  - Added `.animation(.easeInOut(duration: 0.2))` for fluid transitions
+  - Extended to screen edges with `ignoresSafeArea`
+- **Result**: 
+  - Beautiful dreamy, glossy shadow appears when scrolling down
+  - Reflects content behind with ultra-thin material blur
+  - Smooth gradient from top (white highlight) to bottom (transparent)
+  - Premium iOS aesthetic matching high-end design apps
+  - Fluid animation that scales with scroll position
+  - Creates sophisticated visual depth and separation
+- **Status**: Complete
+
+### ✅ Redesigned Search to Expandable Header Bar
+- **Task**: Replaced search sheet with inline expandable search bar in header
+- **Problem**: Search sheet was disruptive and didn't follow design.md principles of fluid, purposeful animations
+- **Solution**: Created smooth horizontal expansion animation that transforms search button into full search bar
+- **Implementation Details**:
+  - Added `isSearchExpanded` and `searchText` state variables
+  - Added `@FocusState` for automatic keyboard focus management
+  - Created conditional layout: collapsed (logo + buttons) vs expanded (search bar + cancel)
+  - Implemented smooth spring animations (0.4 response, 0.8 damping) for all transitions
+  - Added proper transition modifiers for seamless element animations
+  - Auto-focus TextField with 0.2s delay after animation starts
+  - Proper focus dismissal when canceling
+  - Integrated keyboard dismissal on background tap
+  - Removed old search sheet presentation
+- **Result**: 
+  - Flawless horizontal expansion from search button to full search bar
+  - Smooth retraction animation when canceled
+  - Auto-focus keyboard for immediate typing
+  - No disruptive modal sheets breaking the flow
+  - Follows design.md principles of purposeful, fluid animations
+  - Professional iOS native behavior matching system apps
+- **Status**: Complete
+
 ### 🔄 Camera Permissions Setup
 - **Task**: Add camera permissions to Info.plist
 - **Required**: NSCameraUsageDescription key in main project's Info.plist

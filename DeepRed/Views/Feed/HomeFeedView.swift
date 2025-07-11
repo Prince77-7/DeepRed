@@ -29,9 +29,10 @@ struct HomeFeedView: View {
                         showNotifications: $showNotifications,
                         scrollOffset: scrollOffset
                     )
-                    .frame(height: max(0, headerHeight + headerOffset))
+                    .frame(height: headerHeight * headerOpacity)
+                    .offset(y: headerOffset)
                     .clipped()
-                    .animation(.easeInOut(duration: 0.25), value: headerOffset)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: headerOffset)
                     
                     // Video Feed
                     VideoFeedScrollView(
@@ -42,6 +43,29 @@ struct HomeFeedView: View {
                             scrollOffset = offset
                         }
                     )
+                }
+                
+                // Dreamy Top Shadow Overlay
+                VStack {
+                    // Organic shadow gradient that fades naturally
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color.black.opacity(0.25 * scrollProgress), location: 0.0),
+                            .init(color: Color.black.opacity(0.20 * scrollProgress), location: 0.1),
+                            .init(color: Color.black.opacity(0.12 * scrollProgress), location: 0.25),
+                            .init(color: Color.black.opacity(0.06 * scrollProgress), location: 0.45),
+                            .init(color: Color.black.opacity(0.02 * scrollProgress), location: 0.65),
+                            .init(color: Color.black.opacity(0.005 * scrollProgress), location: 0.8),
+                            .init(color: Color.clear, location: 1.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 80)
+                    .ignoresSafeArea(.all, edges: .top)
+                    .animation(.easeInOut(duration: 0.25), value: scrollProgress)
+                    
+                    Spacer()
                 }
                 
                 // Floating Record Button
@@ -58,9 +82,7 @@ struct HomeFeedView: View {
                 }
             }
         }
-        .sheet(isPresented: $showSearch) {
-            SearchView()
-        }
+
         .sheet(isPresented: $showNotifications) {
             NotificationsView()
         }
@@ -74,9 +96,27 @@ struct HomeFeedView: View {
     
     // Native header offset calculation
     private var headerOffset: CGFloat {
-        let threshold: CGFloat = 50
+        let threshold: CGFloat = 60
         let progress = min(max(scrollOffset / threshold, 0), 1)
-        return -progress * headerHeight
+        // Use easeInOut curve for smoother transitions
+        let easedProgress = progress * progress * (3.0 - 2.0 * progress)
+        return -easedProgress * headerHeight
+    }
+    
+    // Native header opacity calculation
+    private var headerOpacity: Double {
+        let threshold: CGFloat = 60
+        let progress = min(max(scrollOffset / threshold, 0), 1)
+        let easedProgress = progress * progress * (3.0 - 2.0 * progress)
+        return 1.0 - easedProgress
+    }
+    
+    // Scroll progress for dreamy overlay
+    private var scrollProgress: Double {
+        let threshold: CGFloat = 80
+        let progress = min(max(scrollOffset / threshold, 0), 1)
+        // Smooth curve for dreamy effect
+        return progress * progress * (3.0 - 2.0 * progress)
     }
 }
 
@@ -89,69 +129,92 @@ struct AnimatedHeader: View {
     
     @State private var logoRotation = 0.0
     @State private var notificationPulse = false
+    @State private var isSearchExpanded = false
+    @State private var searchText = ""
+    @FocusState private var isSearchFocused: Bool
     
-    // Native opacity calculation
+    // Native opacity calculation - synchronized with header offset
     private var headerOpacity: Double {
-        let fadeThreshold: CGFloat = 30
-        let progress = min(max(scrollOffset / fadeThreshold, 0), 1)
-        return 1.0 - progress
+        let threshold: CGFloat = 60 // Match header offset threshold
+        let progress = min(max(scrollOffset / threshold, 0), 1)
+        // Use same easeInOut curve for consistent animation
+        let easedProgress = progress * progress * (3.0 - 2.0 * progress)
+        return 1.0 - easedProgress
     }
     
     var body: some View {
         HStack(spacing: DeepRedDesign.Spacing.sm) {
-            // Logo with subtle animation
-            Button(action: {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                    logoRotation += 360
-                }
-                HapticFeedback.impact(.light)
-            }) {
-                Image("logo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: 28)
-                    .rotationEffect(.degrees(logoRotation))
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: logoRotation)
-            }
-            
-            Spacer()
-            
-            // Action Buttons
-            HStack(spacing: DeepRedDesign.Spacing.sm) {
-                // Search Button
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        showSearch = true
+            if isSearchExpanded {
+                // Expanded Search Mode
+                HStack(spacing: DeepRedDesign.Spacing.sm) {
+                    // Search Field
+                    HStack(spacing: DeepRedDesign.Spacing.xs) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(DeepRedDesign.Colors.graphite)
+                        
+                        TextField("Search creators, videos...", text: $searchText)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundColor(DeepRedDesign.Colors.onyx)
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .focused($isSearchFocused)
                     }
-                    HapticFeedback.impact(.light)
-                }) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(DeepRedDesign.Colors.onyx)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            Circle()
-                                .fill(DeepRedDesign.Colors.snow)
-                                .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
-                        )
-                }
-                .scaleEffect(showSearch ? 0.95 : 1.0)
-                .animation(.easeInOut(duration: 0.1), value: showSearch)
-                
-                // Notifications Button
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        showNotifications = true
-                        notificationPulse = true
-                    }
-                    HapticFeedback.impact(.light)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(DeepRedDesign.Colors.ash)
+                    )
+                    .transition(.scale.combined(with: .opacity))
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        notificationPulse = false
+                    // Cancel Button
+                    Button("Cancel") {
+                        isSearchFocused = false
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isSearchExpanded = false
+                            searchText = ""
+                        }
+                        HapticFeedback.impact(.light)
                     }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(DeepRedDesign.Colors.onyx)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+                .transition(.slide)
+            } else {
+                // Collapsed Normal Mode
+                // Logo with subtle animation
+                Button(action: {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        logoRotation += 360
+                    }
+                    HapticFeedback.impact(.light)
                 }) {
-                    ZStack {
-                        Image(systemName: "bell")
+                    Image("logo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 28)
+                        .rotationEffect(.degrees(logoRotation))
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: logoRotation)
+                }
+                .transition(.move(edge: .leading).combined(with: .opacity))
+                
+                Spacer()
+                
+                // Action Buttons
+                HStack(spacing: DeepRedDesign.Spacing.sm) {
+                    // Search Button
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isSearchExpanded = true
+                        }
+                        // Auto-focus after animation starts
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            isSearchFocused = true
+                        }
+                        HapticFeedback.impact(.light)
+                    }) {
+                        Image(systemName: "magnifyingglass")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(DeepRedDesign.Colors.onyx)
                             .frame(width: 36, height: 36)
@@ -160,30 +223,57 @@ struct AnimatedHeader: View {
                                     .fill(DeepRedDesign.Colors.snow)
                                     .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
                             )
-                            .scaleEffect(notificationPulse ? 1.1 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: notificationPulse)
+                    }
+                    
+                    // Notifications Button
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            showNotifications = true
+                            notificationPulse = true
+                        }
+                        HapticFeedback.impact(.light)
                         
-                        // Notification Badge
-                        Circle()
-                            .fill(DeepRedDesign.Colors.accent)
-                            .frame(width: 10, height: 10)
-                            .overlay(
-                                Text("3")
-                                    .font(.system(size: 7, weight: .bold))
-                                    .foregroundColor(.white)
-                            )
-                            .offset(x: 10, y: -10)
-                            .scaleEffect(notificationPulse ? 1.2 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: notificationPulse)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            notificationPulse = false
+                        }
+                    }) {
+                        ZStack {
+                            Image(systemName: "bell")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(DeepRedDesign.Colors.onyx)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Circle()
+                                        .fill(DeepRedDesign.Colors.snow)
+                                        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+                                )
+                                .scaleEffect(notificationPulse ? 1.1 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: notificationPulse)
+                            
+                            // Notification Badge
+                            Circle()
+                                .fill(DeepRedDesign.Colors.accent)
+                                .frame(width: 10, height: 10)
+                                .overlay(
+                                    Text("3")
+                                        .font(.system(size: 7, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                                .offset(x: 10, y: -10)
+                                .scaleEffect(notificationPulse ? 1.2 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: notificationPulse)
+                        }
                     }
                 }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
         .padding(.vertical, DeepRedDesign.Spacing.xs)
-        .background(DeepRedDesign.Colors.primaryBackground)
+        .background(Color.white)
         .opacity(headerOpacity)
-        .animation(.easeInOut(duration: 0.2), value: headerOpacity)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: headerOpacity)
+        .dismissKeyboardOnBackgroundTap()
     }
 }
 
@@ -241,9 +331,6 @@ struct VideoFeedScrollView: View {
                             .onAppear {
                                 scrollViewBounds = geometry.frame(in: .global)
                             }
-                            .onChange(of: geometry.frame(in: .global)) { _, newValue in
-                                scrollViewBounds = newValue
-                            }
                             .onChange(of: geometry.frame(in: .named("scrollView")).minY) { _, newValue in
                                 onScrollChanged(-newValue)
                                 updateCurrentIndexBasedOnScreenCenter()
@@ -266,7 +353,16 @@ struct VideoFeedScrollView: View {
     
     private func updateCardPosition(index: Int, geometry: GeometryProxy) {
         let frame = geometry.frame(in: .global)
-        cardPositions[index] = frame.midY
+        let newMidY = frame.midY
+        
+        // Only update if position changed by more than 1pt to reduce unnecessary updates
+        if let currentMidY = cardPositions[index] {
+            if abs(newMidY - currentMidY) > 1.0 {
+                cardPositions[index] = newMidY
+            }
+        } else {
+            cardPositions[index] = newMidY
+        }
     }
     
     private func updateCurrentIndexBasedOnScreenCenter() {

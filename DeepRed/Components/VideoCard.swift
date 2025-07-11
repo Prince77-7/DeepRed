@@ -309,6 +309,8 @@ struct VideoCard: View {
         .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
         .sheet(isPresented: $showComments) {
             CommentsSheet(video: video)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showUserProfile) {
             UserProfileSheet(user: video.user)
@@ -373,7 +375,6 @@ struct CommentsSheet: View {
             }
             .primaryBackground()
         }
-        .presentationDragIndicator(.visible)
     }
 }
 
