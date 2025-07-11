@@ -207,7 +207,7 @@ struct VideoFeedScrollView: View {
                     
                     // Video Cards
                     ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
-                        VideoCard(video: video)
+                        VideoCard(video: video, allVideos: videos, videoIndex: index)
                             .id(video.id)
                             .scaleEffect(getScaleEffect(for: index))
                             .opacity(getOpacity(for: index))

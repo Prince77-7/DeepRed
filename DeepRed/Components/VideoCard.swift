@@ -4,18 +4,23 @@ import SwiftUI
 
 struct VideoCard: View {
     let video: VideoPost
+    let allVideos: [VideoPost]
+    let videoIndex: Int
     @State private var isUpvoted: Bool
     @State private var isDownvoted: Bool
     @State private var upvoteCount: Int
     @State private var downvoteCount: Int
     @State private var showUserProfile = false
     @State private var showComments = false
+    @State private var showShortsViewer = false
     @State private var upvoteAnimation = false
     @State private var downvoteAnimation = false
     @State private var shareAnimation = false
     
-    init(video: VideoPost) {
+    init(video: VideoPost, allVideos: [VideoPost] = [], videoIndex: Int = 0) {
         self.video = video
+        self.allVideos = allVideos
+        self.videoIndex = videoIndex
         self._isUpvoted = State(initialValue: video.isLiked)
         self._isDownvoted = State(initialValue: false)
         // Sample vote counts - in real app this would come from the video model
@@ -67,6 +72,11 @@ struct VideoCard: View {
                             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: upvoteAnimation)
                     }
                 )
+                .onTapGesture(count: 2) {
+                    // Double-tap to open shorts viewer
+                    HapticFeedback.impact(.medium)
+                    showShortsViewer = true
+                }
             
             // Minimal Content Overlay
             VStack {
@@ -303,6 +313,9 @@ struct VideoCard: View {
         .sheet(isPresented: $showUserProfile) {
             UserProfileSheet(user: video.user)
         }
+        .fullScreenCover(isPresented: $showShortsViewer) {
+            ShortsViewer(videos: allVideos.isEmpty ? [video] : allVideos, initialIndex: videoIndex)
+        }
     }
 }
 
@@ -481,7 +494,7 @@ struct UserProfileSheet: View {
 // MARK: - Preview
 
 #Preview("Video Card") {
-    VideoCard(video: SampleData.sampleVideos[0])
+    VideoCard(video: SampleData.sampleVideos[0], allVideos: SampleData.sampleVideos, videoIndex: 0)
         .padding()
         .primaryBackground()
 } 
