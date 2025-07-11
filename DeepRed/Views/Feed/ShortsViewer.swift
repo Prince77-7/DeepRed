@@ -28,24 +28,31 @@ struct ShortsViewer: View {
                 .ignoresSafeArea()
             
             // Vertical Video Stack
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
-                        ShortsVideoView(
-                            video: video,
-                            isCurrentVideo: index == currentIndex,
-                            onDismiss: { 
-                                handleDismiss()
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
+                            ShortsVideoView(
+                                video: video,
+                                isCurrentVideo: index == currentIndex,
+                                onDismiss: { 
+                                    handleDismiss()
+                                }
+                            )
+                            .frame(height: UIScreen.main.bounds.height)
+                            .id(index) // Add ID for scroll targeting
+                            .onAppear {
+                                currentIndex = index
                             }
-                        )
-                        .frame(height: UIScreen.main.bounds.height)
-                        .onAppear {
-                            currentIndex = index
                         }
                     }
                 }
+                .scrollTargetBehavior(.paging)
+                .onAppear {
+                    // Instantly position at the selected video without animation
+                    proxy.scrollTo(initialIndex, anchor: .top)
+                }
             }
-            .scrollTargetBehavior(.paging)
             .ignoresSafeArea()
         }
         .scaleEffect(isDismissing ? 0.9 : 1.0)

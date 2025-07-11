@@ -656,6 +656,22 @@
   - No gesture conflicts between single-tap and double-tap
   - Smooth dismissal animation works properly
 - **Status**: Complete
+
+### ✅ Fixed Initial Video Position in Shorts Viewer
+- **Task**: Fixed issue where shorts viewer always started from the first video instead of the video that was double-tapped
+- **Problem**: When double-tapping a specific video card in the home feed, the shorts viewer opened but started from the top (first video) instead of the selected video
+- **Solution**: 
+  - Added `ScrollViewReader` to enable programmatic scrolling
+  - Added unique `id(index)` to each video for scroll targeting
+  - Added `onAppear` with `scrollTo(initialIndex)` to instantly position at the correct video
+  - Removed animation and delay for instant positioning (no visible scrolling)
+  - Immediate video positioning without any transition time
+- **Result**: 
+  - Double-tap on any video in home feed → Opens shorts viewer instantly at that exact video
+  - No visible scrolling animation from top to selected video
+  - Instant positioning saves crucial split seconds for better UX
+  - Perfect user experience with immediate video display
+- **Status**: Complete
 - **Structures Fixed**:
   - ServiceCategory (line 7)
   - Business (line 15)
