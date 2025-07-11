@@ -195,6 +195,9 @@ struct VideoFeedScrollView: View {
     @Binding var refreshing: Bool
     let onScrollChanged: (CGFloat) -> Void
     
+    @State private var cardPositions: [Int: CGFloat] = [:]
+    @State private var scrollViewBounds: CGRect = .zero
+    
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
@@ -211,10 +214,18 @@ struct VideoFeedScrollView: View {
                             .id(video.id)
                             .scaleEffect(getScaleEffect(for: index))
                             .opacity(getOpacity(for: index))
-                            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: currentIndex)
-                            .onAppear {
-                                updateCurrentIndex(index)
-                            }
+                            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: currentIndex)
+                            .background(
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .onAppear {
+                                            updateCardPosition(index: index, geometry: geometry)
+                                        }
+                                        .onChange(of: geometry.frame(in: .named("scrollView")).midY) { _, newValue in
+                                            updateCardPosition(index: index, geometry: geometry)
+                                        }
+                                }
+                            )
                     }
                     
                     // Loading more indicator
@@ -227,8 +238,15 @@ struct VideoFeedScrollView: View {
                 .background(
                     GeometryReader { geometry in
                         Color.clear
+                            .onAppear {
+                                scrollViewBounds = geometry.frame(in: .global)
+                            }
+                            .onChange(of: geometry.frame(in: .global)) { _, newValue in
+                                scrollViewBounds = newValue
+                            }
                             .onChange(of: geometry.frame(in: .named("scrollView")).minY) { _, newValue in
                                 onScrollChanged(-newValue)
+                                updateCurrentIndexBasedOnScreenCenter()
                             }
                     }
                 )
@@ -246,14 +264,51 @@ struct VideoFeedScrollView: View {
         }
     }
     
+    private func updateCardPosition(index: Int, geometry: GeometryProxy) {
+        let frame = geometry.frame(in: .global)
+        cardPositions[index] = frame.midY
+    }
+    
+    private func updateCurrentIndexBasedOnScreenCenter() {
+        guard !cardPositions.isEmpty else { return }
+        
+        // Get the actual device screen center Y position
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first?.windows
+            .first else { return }
+        
+        let deviceScreenCenter = window.bounds.height / 2
+        
+        // Find the card whose center is closest to the actual device screen center
+        var bestIndex = currentIndex
+        var smallestDistance = CGFloat.greatestFiniteMagnitude
+        
+        for (index, cardCenterY) in cardPositions {
+            let distance = abs(cardCenterY - deviceScreenCenter)
+            
+            if distance < smallestDistance {
+                smallestDistance = distance
+                bestIndex = index
+            }
+        }
+        
+        // Update current index if we found a closer card
+        if bestIndex != currentIndex {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                currentIndex = bestIndex
+            }
+        }
+    }
+    
     private func getScaleEffect(for index: Int) -> CGFloat {
         let distance = abs(index - currentIndex)
         if distance == 0 {
             return 1.0
         } else if distance == 1 {
-            return 0.95
+            return 0.96
         } else {
-            return 0.9
+            return 0.92
         }
     }
     
@@ -262,15 +317,9 @@ struct VideoFeedScrollView: View {
         if distance == 0 {
             return 1.0
         } else if distance == 1 {
-            return 0.7
+            return 0.8
         } else {
-            return 0.5
-        }
-    }
-    
-    private func updateCurrentIndex(_ index: Int) {
-        if index != currentIndex {
-            currentIndex = index
+            return 0.6
         }
     }
     
