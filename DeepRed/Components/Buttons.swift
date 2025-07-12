@@ -178,7 +178,6 @@ struct RecordButton: View {
 struct FloatingRecordButton: View {
     let action: () -> Void
     @State private var isPressed = false
-    @State private var pulseAnimation = false
     
     var body: some View {
         Button(action: {
@@ -196,8 +195,6 @@ struct FloatingRecordButton: View {
                         x: 0,
                         y: 8
                     )
-                    .scaleEffect(isPressed ? 0.95 : 1.0)
-                    .scaleEffect(pulseAnimation ? 1.05 : 1.0)
                 
                 // Record icon
                 Image(systemName: "plus")
@@ -208,13 +205,9 @@ struct FloatingRecordButton: View {
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-        .animation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true), value: pulseAnimation)
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+        .onLongPressGesture(minimumDuration: 0, pressing: { pressing in
             isPressed = pressing
         }, perform: {})
-        .onAppear {
-            pulseAnimation = true
-        }
     }
 }
 

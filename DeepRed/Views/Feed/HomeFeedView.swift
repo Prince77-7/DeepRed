@@ -20,7 +20,7 @@ struct HomeFeedView: View {
     // Refresh trigger from tab bar
     @Binding private var refreshTrigger: Bool
     
-    private let videos = SampleData.sampleVideos
+    private let posts = SampleData.sampleVideos
     private let headerHeight: CGFloat = 60
     private let maxPullOffset: CGFloat = 100 // Threshold for pull-to-search activation
     
@@ -48,9 +48,9 @@ struct HomeFeedView: View {
                     .clipped()
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: headerOffset)
                     
-                    // Video Feed with Pull-to-Search
+                    // Mixed Content Feed with Pull-to-Search
                     VideoFeedScrollView(
-                        videos: videos,
+                        videos: posts,
                         currentIndex: $currentVideoIndex,
                         pullToSearchOffset: $pullToSearchOffset,
                         showPullToSearch: $showPullToSearch,
@@ -556,7 +556,7 @@ struct AnimatedHeader: View {
 // MARK: - Video Feed Scroll View
 
 struct VideoFeedScrollView: View {
-    let videos: [VideoPost]
+    let videos: [Post]
     @Binding var currentIndex: Int
     @Binding var pullToSearchOffset: CGFloat
     @Binding var showPullToSearch: Bool
@@ -572,24 +572,33 @@ struct VideoFeedScrollView: View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: DeepRedDesign.Spacing.md) {
-                    // Video Cards
-                    ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
-                        VideoCard(video: video, allVideos: videos, videoIndex: index)
-                            .id(video.id)
-                            .scaleEffect(getScaleEffect(for: index))
-                            .opacity(getOpacity(for: index))
-                            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: currentIndex)
-                            .background(
-                                GeometryReader { geometry in
-                                    Color.clear
-                                        .onAppear {
-                                            updateCardPosition(index: index, geometry: geometry)
-                                        }
-                                        .onChange(of: geometry.frame(in: .named("scrollView")).midY) { _, newValue in
-                                            updateCardPosition(index: index, geometry: geometry)
-                                        }
-                                }
-                            )
+                    // Mixed Content Cards
+                    ForEach(Array(videos.enumerated()), id: \.element.id) { index, post in
+                        Group {
+                            switch post.contentType {
+                            case .video:
+                                VideoCard(video: post, allVideos: videos, videoIndex: index)
+                            case .text:
+                                TextCard(post: post, allPosts: videos, postIndex: index)
+                            case .image:
+                                ImageCard(post: post, allPosts: videos, postIndex: index)
+                            }
+                        }
+                        .id(post.id)
+                        .scaleEffect(getScaleEffect(for: index))
+                        .opacity(getOpacity(for: index))
+                        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: currentIndex)
+                        .background(
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .onAppear {
+                                        updateCardPosition(index: index, geometry: geometry)
+                                    }
+                                    .onChange(of: geometry.frame(in: .named("scrollView")).midY) { _, newValue in
+                                        updateCardPosition(index: index, geometry: geometry)
+                                    }
+                            }
+                        )
                     }
                     
                     // Loading more indicator

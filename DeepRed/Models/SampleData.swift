@@ -66,14 +66,109 @@ struct User: Identifiable, Codable {
     }
 }
 
+// MARK: - Post Content Type
+
+enum PostContentType: String, Codable, CaseIterable {
+    case video = "video"
+    case text = "text"
+    case image = "image"
+    
+    var displayName: String {
+        switch self {
+        case .video: return "Video"
+        case .text: return "Text"
+        case .image: return "Image"
+        }
+    }
+    
+    var iconName: String {
+        switch self {
+        case .video: return "video.fill"
+        case .text: return "text.alignleft"
+        case .image: return "photo.fill"
+        }
+    }
+}
+
+// MARK: - Post Content Data
+
+struct PostContent: Codable {
+    // Video content
+    let videoThumbnail: String?
+    let duration: TimeInterval?
+    let musicTitle: String?
+    
+    // Text content
+    let textContent: String?
+    let textStyle: TextStyle?
+    
+    // Image content
+    let imageURL: String?
+    let imageCaption: String?
+    let imageAltText: String?
+    
+    init(video: String, duration: TimeInterval, musicTitle: String? = nil) {
+        self.videoThumbnail = video
+        self.duration = duration
+        self.musicTitle = musicTitle
+        self.textContent = nil
+        self.textStyle = nil
+        self.imageURL = nil
+        self.imageCaption = nil
+        self.imageAltText = nil
+    }
+    
+    init(text: String, style: TextStyle = .normal) {
+        self.textContent = text
+        self.textStyle = style
+        self.videoThumbnail = nil
+        self.duration = nil
+        self.musicTitle = nil
+        self.imageURL = nil
+        self.imageCaption = nil
+        self.imageAltText = nil
+    }
+    
+    init(image: String, caption: String? = nil, altText: String? = nil) {
+        self.imageURL = image
+        self.imageCaption = caption
+        self.imageAltText = altText
+        self.videoThumbnail = nil
+        self.duration = nil
+        self.musicTitle = nil
+        self.textContent = nil
+        self.textStyle = nil
+    }
+}
+
+enum TextStyle: String, Codable, CaseIterable {
+    case normal = "normal"
+    case bold = "bold"
+    case italic = "italic"
+    case quote = "quote"
+    case code = "code"
+    case heading = "heading"
+    
+    var displayName: String {
+        switch self {
+        case .normal: return "Normal"
+        case .bold: return "Bold"
+        case .italic: return "Italic"
+        case .quote: return "Quote"
+        case .code: return "Code"
+        case .heading: return "Heading"
+        }
+    }
+}
+
 // MARK: - Video/Post Model
 
-struct VideoPost: Identifiable, Codable {
+struct Post: Identifiable, Codable {
     let id: UUID
     let user: User
+    let contentType: PostContentType
+    let content: PostContent
     let caption: String
-    let videoThumbnail: String
-    let duration: TimeInterval
     let likeCount: Int
     let commentCount: Int
     let shareCount: Int
@@ -82,15 +177,14 @@ struct VideoPost: Identifiable, Codable {
     let isBookmarked: Bool
     let createdAt: Date
     let tags: [String]
-    let musicTitle: String?
     let location: String?
     
-    init(user: User, caption: String, videoThumbnail: String, duration: TimeInterval, likeCount: Int, commentCount: Int, shareCount: Int, viewCount: Int, isLiked: Bool, isBookmarked: Bool, createdAt: Date, tags: [String], musicTitle: String? = nil, location: String? = nil) {
+    init(user: User, contentType: PostContentType, content: PostContent, caption: String, likeCount: Int, commentCount: Int, shareCount: Int, viewCount: Int, isLiked: Bool, isBookmarked: Bool, createdAt: Date, tags: [String], location: String? = nil) {
         self.id = UUID()
         self.user = user
+        self.contentType = contentType
+        self.content = content
         self.caption = caption
-        self.videoThumbnail = videoThumbnail
-        self.duration = duration
         self.likeCount = likeCount
         self.commentCount = commentCount
         self.shareCount = shareCount
@@ -99,7 +193,6 @@ struct VideoPost: Identifiable, Codable {
         self.isBookmarked = isBookmarked
         self.createdAt = createdAt
         self.tags = tags
-        self.musicTitle = musicTitle
         self.location = location
     }
     
@@ -107,9 +200,9 @@ struct VideoPost: Identifiable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = UUID() // Generate new UUID when decoding
         self.user = try container.decode(User.self, forKey: .user)
+        self.contentType = try container.decode(PostContentType.self, forKey: .contentType)
+        self.content = try container.decode(PostContent.self, forKey: .content)
         self.caption = try container.decode(String.self, forKey: .caption)
-        self.videoThumbnail = try container.decode(String.self, forKey: .videoThumbnail)
-        self.duration = try container.decode(TimeInterval.self, forKey: .duration)
         self.likeCount = try container.decode(Int.self, forKey: .likeCount)
         self.commentCount = try container.decode(Int.self, forKey: .commentCount)
         self.shareCount = try container.decode(Int.self, forKey: .shareCount)
@@ -118,12 +211,11 @@ struct VideoPost: Identifiable, Codable {
         self.isBookmarked = try container.decode(Bool.self, forKey: .isBookmarked)
         self.createdAt = try container.decode(Date.self, forKey: .createdAt)
         self.tags = try container.decode([String].self, forKey: .tags)
-        self.musicTitle = try container.decodeIfPresent(String.self, forKey: .musicTitle)
         self.location = try container.decodeIfPresent(String.self, forKey: .location)
     }
     
     private enum CodingKeys: String, CodingKey {
-        case user, caption, videoThumbnail, duration, likeCount, commentCount, shareCount, viewCount, isLiked, isBookmarked, createdAt, tags, musicTitle, location
+        case user, contentType, content, caption, likeCount, commentCount, shareCount, viewCount, isLiked, isBookmarked, createdAt, tags, location
     }
     
     var likeCountFormatted: String {
@@ -145,7 +237,15 @@ struct VideoPost: Identifiable, Codable {
             return "\(viewCount) views"
         }
     }
+    
+    // Computed properties for backward compatibility
+    var videoThumbnail: String { content.videoThumbnail ?? "" }
+    var duration: TimeInterval { content.duration ?? 0 }
+    var musicTitle: String? { content.musicTitle }
 }
+
+// Legacy VideoPost typealias for backward compatibility
+typealias VideoPost = Post
 
 // MARK: - Service/Gig Model
 
@@ -323,13 +423,14 @@ class SampleData {
         )
     ]
     
-    // MARK: - Sample Videos
-    static let sampleVideos: [VideoPost] = [
-        VideoPost(
+    // MARK: - Sample Posts (Mixed Content)
+    static let sampleVideos: [Post] = [
+        // Video Post
+        Post(
             user: sampleUsers[0],
+            contentType: .video,
+            content: PostContent(video: "video.thumbnail.1", duration: 45.0, musicTitle: "Creative Flow - Ambient Beats"),
             caption: "5 design principles that changed how I create content ✨ Which one resonates with you most? #DesignTips #ContentCreator",
-            videoThumbnail: "video.thumbnail.1",
-            duration: 45.0,
             likeCount: 12400,
             commentCount: 234,
             shareCount: 89,
@@ -338,14 +439,14 @@ class SampleData {
             isBookmarked: false,
             createdAt: Date().addingTimeInterval(-3600 * 4), // 4 hours ago
             tags: ["Design", "Tips", "Creative"],
-            musicTitle: "Creative Flow - Ambient Beats",
             location: "New York, NY"
         ),
-        VideoPost(
+        // Text Post
+        Post(
             user: sampleUsers[1],
+            contentType: .text,
+            content: PostContent(text: "The hardest part about building a startup isn't the code or the marketing—it's the moments of doubt when you're not sure if anyone actually needs what you're building.\n\nBut here's what I've learned: those moments of uncertainty are where the magic happens. They force you to really listen to your users, to pivot when necessary, and to build something that truly matters.\n\nDay 30 update: 1,000 users and counting. The journey continues... 🚀", style: .normal),
             caption: "Building my first SaaS product from scratch 🚀 Day 30 update: we just hit 1000 users! The journey continues...",
-            videoThumbnail: "video.thumbnail.2",
-            duration: 60.0,
             likeCount: 8900,
             commentCount: 456,
             shareCount: 123,
@@ -354,14 +455,14 @@ class SampleData {
             isBookmarked: true,
             createdAt: Date().addingTimeInterval(-3600 * 8), // 8 hours ago
             tags: ["Tech", "Startup", "SaaS"],
-            musicTitle: "Upbeat Motivation - Electronic",
             location: "Austin, TX"
         ),
-        VideoPost(
+        // Image Post
+        Post(
             user: sampleUsers[2],
+            contentType: .image,
+            content: PostContent(image: "morning.routine.image", caption: "My 15-minute morning routine setup", altText: "Clean desk with journal, water bottle, and workout mat"),
             caption: "15-minute morning routine that transforms your entire day 💪 Try this for one week and feel the difference! #MorningMotivation #Wellness",
-            videoThumbnail: "video.thumbnail.3",
-            duration: 15.0,
             likeCount: 23600,
             commentCount: 789,
             shareCount: 234,
@@ -370,14 +471,14 @@ class SampleData {
             isBookmarked: false,
             createdAt: Date().addingTimeInterval(-3600 * 12), // 12 hours ago
             tags: ["Fitness", "Wellness", "Routine"],
-            musicTitle: "Morning Energy - Acoustic",
             location: "Los Angeles, CA"
         ),
-        VideoPost(
+        // Video Post
+        Post(
             user: sampleUsers[3],
+            contentType: .video,
+            content: PostContent(video: "video.thumbnail.4", duration: 90.0, musicTitle: "Original Mix - Alex Thompson"),
             caption: "The secret to mixing vocals that sit perfectly in the mix 🎵 Studio techniques that pros don't want you to know!",
-            videoThumbnail: "video.thumbnail.4",
-            duration: 90.0,
             likeCount: 15300,
             commentCount: 345,
             shareCount: 67,
@@ -386,14 +487,14 @@ class SampleData {
             isBookmarked: false,
             createdAt: Date().addingTimeInterval(-3600 * 18), // 18 hours ago
             tags: ["Music", "Production", "Tutorial"],
-            musicTitle: "Original Mix - Alex Thompson",
             location: "Nashville, TN"
         ),
-        VideoPost(
+        // Text Post
+        Post(
             user: currentUser,
+            contentType: .text,
+            content: PostContent(text: "Personal branding isn't about creating a fake version of yourself—it's about amplifying the best parts of who you already are.\n\nHere's what I learned after 2 years and 10M+ views:\n\n1. Authenticity beats perfection every time\n2. Consistency matters more than viral moments\n3. Your audience wants to see the real you, not just the highlight reel\n4. Value first, promotion second\n5. Building trust takes time but pays dividends\n\nThe creators who last are the ones who stay true to themselves while serving their audience. Everything else is just noise.", style: .normal),
             caption: "Why 90% of content creators fail at personal branding 📱 Here's what I learned after 2 years and 10M+ views...",
-            videoThumbnail: "video.thumbnail.5",
-            duration: 120.0,
             likeCount: 34500,
             commentCount: 1200,
             shareCount: 456,
@@ -402,8 +503,55 @@ class SampleData {
             isBookmarked: true,
             createdAt: Date().addingTimeInterval(-3600 * 24), // 1 day ago
             tags: ["Marketing", "Branding", "CreatorTips"],
-            musicTitle: "Inspiring Journey - Cinematic",
             location: "San Francisco, CA"
+        ),
+        // Image Post
+        Post(
+            user: sampleUsers[4],
+            contentType: .image,
+            content: PostContent(image: "design.inspiration.image", caption: "Latest brand identity work", altText: "Colorful brand identity design with logo variations"),
+            caption: "Just finished this brand identity for a sustainable fashion startup 🌿 The colors represent growth, authenticity, and innovation. What do you think?",
+            likeCount: 7200,
+            commentCount: 156,
+            shareCount: 89,
+            viewCount: 45600,
+            isLiked: false,
+            isBookmarked: false,
+            createdAt: Date().addingTimeInterval(-3600 * 36), // 36 hours ago
+            tags: ["Design", "Branding", "Sustainability"],
+            location: "Portland, OR"
+        ),
+        // Video Post
+        Post(
+            user: sampleUsers[0],
+            contentType: .video,
+            content: PostContent(video: "video.thumbnail.6", duration: 75.0, musicTitle: "Focus Flow - Lo-Fi Beats"),
+            caption: "Quick design tip: Use the 60-30-10 rule for color balance ✨ 60% dominant color, 30% secondary, 10% accent. Works every time!",
+            likeCount: 18900,
+            commentCount: 287,
+            shareCount: 156,
+            viewCount: 178500,
+            isLiked: true,
+            isBookmarked: false,
+            createdAt: Date().addingTimeInterval(-3600 * 48), // 2 days ago
+            tags: ["Design", "Tips", "Color"],
+            location: "New York, NY"
+        ),
+        // Text Post
+        Post(
+            user: sampleUsers[2],
+            contentType: .text,
+            content: PostContent(text: "Reminder: Your progress doesn't have to be perfect to be powerful.\n\nThat 10-minute walk counts.\nThat healthy meal you chose counts.\nThat extra hour of sleep counts.\nThat moment of kindness to yourself counts.\n\nSmall steps, consistently taken, create extraordinary transformations. You don't need to completely overhaul your life overnight. You just need to show up for yourself, one choice at a time.\n\nWhat's one small step you're taking today? 💪", style: .normal),
+            caption: "Progress over perfection, always 💪 Small steps lead to big changes! #MindsetMonday #GrowthMindset",
+            likeCount: 41200,
+            commentCount: 892,
+            shareCount: 567,
+            viewCount: 298700,
+            isLiked: false,
+            isBookmarked: true,
+            createdAt: Date().addingTimeInterval(-3600 * 72), // 3 days ago
+            tags: ["Mindset", "Growth", "Motivation"],
+            location: "Los Angeles, CA"
         )
     ]
     
