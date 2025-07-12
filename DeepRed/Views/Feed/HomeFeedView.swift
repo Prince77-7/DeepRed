@@ -13,7 +13,7 @@ struct HomeFeedView: View {
     
     private let videos = SampleData.sampleVideos
     private let headerHeight: CGFloat = 70
-    private let navigationHeight: CGFloat = 65 // Standard iOS navigation bar height
+    private let navigationHeight: CGFloat = 80 // Increased navigation bar height
     
     var body: some View {
         NavigationStack {
@@ -49,12 +49,12 @@ struct HomeFeedView: View {
                     // Organic shadow gradient that fades naturally
                     LinearGradient(
                         gradient: Gradient(stops: [
-                            .init(color: Color.black.opacity(0.25 * scrollProgress), location: 0.0),
-                            .init(color: Color.black.opacity(0.20 * scrollProgress), location: 0.1),
-                            .init(color: Color.black.opacity(0.12 * scrollProgress), location: 0.25),
+                            .init(color: Color.black.opacity(0.70 * scrollProgress), location: 0.0),
+                            .init(color: Color.black.opacity(0.50 * scrollProgress), location: 0.1),
+                            .init(color: Color.black.opacity(0.40 * scrollProgress), location: 0.25),
                             .init(color: Color.black.opacity(0.06 * scrollProgress), location: 0.45),
                             .init(color: Color.black.opacity(0.02 * scrollProgress), location: 0.65),
-                            .init(color: Color.black.opacity(0.005 * scrollProgress), location: 0.8),
+                            .init(color: Color.clear.opacity(0.005 * scrollProgress), location: 0.8),
                             .init(color: Color.clear, location: 1.0)
                         ]),
                         startPoint: .top,
@@ -75,13 +75,14 @@ struct HomeFeedView: View {
                                 LinearGradient(
                                     gradient: Gradient(colors: [
                                         Color.black.opacity(0.8),
-                                        Color.gray.opacity(0.3)
+                                        Color.clear
                                     ]),
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
                             )
                             .frame(height: navigationHeight)
+                            .blur(radius: 0.5)
                             .ignoresSafeArea()
                         .transition(.asymmetric(
                             insertion: .move(edge: .top).combined(with: .opacity),
@@ -91,7 +92,7 @@ struct HomeFeedView: View {
                     
                     Spacer()
                 }
-                .animation(.spring(response: 0.5, dampingFraction: 0.75), value: shouldShowNavigation)
+                //.animation(.spring(response: 0.5, dampingFraction: 0.75), value: shouldShowNavigation)
                 
                 // Floating Record Button
                 VStack {
