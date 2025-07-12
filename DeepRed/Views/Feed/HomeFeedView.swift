@@ -12,38 +12,37 @@ struct HomeFeedView: View {
     @State private var showCameraView = false
     
     private let videos = SampleData.sampleVideos
-    private let headerHeight: CGFloat = 60
+    private let headerHeight: CGFloat = 70
+    private let navigationHeight: CGFloat = 65 // Standard iOS navigation bar height
     
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background
-                DeepRedDesign.Colors.primaryBackground
+                Color.white
                     .ignoresSafeArea()
                 
-                // Main Content
-                VStack(spacing: 0) {
-                    // Native Header with proper layout management
-                    AnimatedHeader(
-                        showSearch: $showSearch,
-                        showNotifications: $showNotifications,
-                        scrollOffset: scrollOffset
-                    )
-                    .frame(height: headerHeight * headerOpacity)
-                    .offset(y: headerOffset)
-                    .clipped()
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: headerOffset)
-                    
-                    // Video Feed
-                    VideoFeedScrollView(
-                        videos: videos,
-                        currentIndex: $currentVideoIndex,
-                        refreshing: $refreshing,
-                        onScrollChanged: { offset in
-                            scrollOffset = offset
-                        }
-                    )
-                }
+                // Main Content - Header scrolls with content
+                VideoFeedScrollView(
+                    videos: videos,
+                    currentIndex: $currentVideoIndex,
+                    refreshing: $refreshing,
+                    onScrollChanged: { offset in
+                        scrollOffset = offset
+                    },
+                    headerView: {
+                        AnyView(
+                            AnimatedHeader(
+                                showSearch: $showSearch,
+                                showNotifications: $showNotifications,
+                                scrollOffset: scrollOffset
+                            )
+                            .frame(height: headerHeight)
+                        )
+                    }
+                )
+                
+
                 
                 // Dreamy Top Shadow Overlay
                 VStack {
@@ -67,6 +66,32 @@ struct HomeFeedView: View {
                     
                     Spacer()
                 }
+                
+                // Top Navigation Bar (appears while scrolling) - Empty/clean
+                VStack {
+                    if shouldShowNavigation {
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.black.opacity(0.8),
+                                        Color.gray.opacity(0.3)
+                                    ]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(height: navigationHeight)
+                            .ignoresSafeArea()
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity),
+                            removal: .move(edge: .top).combined(with: .opacity)
+                        ))
+                    }
+                    
+                    Spacer()
+                }
+                .animation(.spring(response: 0.5, dampingFraction: 0.75), value: shouldShowNavigation)
                 
                 // Floating Record Button
                 VStack {
@@ -94,22 +119,7 @@ struct HomeFeedView: View {
         .environmentObject(appState)
     }
     
-    // Native header offset calculation
-    private var headerOffset: CGFloat {
-        let threshold: CGFloat = 60
-        let progress = min(max(scrollOffset / threshold, 0), 1)
-        // Use easeInOut curve for smoother transitions
-        let easedProgress = progress * progress * (3.0 - 2.0 * progress)
-        return -easedProgress * headerHeight
-    }
-    
-    // Native header opacity calculation
-    private var headerOpacity: Double {
-        let threshold: CGFloat = 60
-        let progress = min(max(scrollOffset / threshold, 0), 1)
-        let easedProgress = progress * progress * (3.0 - 2.0 * progress)
-        return 1.0 - easedProgress
-    }
+
     
     // Scroll progress for dreamy overlay
     private var scrollProgress: Double {
@@ -118,7 +128,15 @@ struct HomeFeedView: View {
         // Smooth curve for dreamy effect
         return progress * progress * (3.0 - 2.0 * progress)
     }
+    
+    // Show navigation when scrolling down
+    private var shouldShowNavigation: Bool {
+        scrollOffset > 80
+    }
+
 }
+
+
 
 // MARK: - Animated Header
 
@@ -178,16 +196,13 @@ struct AnimatedHeader: View {
                     }
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(DeepRedDesign.Colors.onyx)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+
                 }
-                .transition(.slide)
             } else {
                 // Collapsed Normal Mode
-                // Logo with subtle animation
+                // Logo without animation
                 Button(action: {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                        logoRotation += 360
-                    }
+                    logoRotation += 360
                     HapticFeedback.impact(.light)
                 }) {
                     Image("logo")
@@ -195,9 +210,8 @@ struct AnimatedHeader: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 28)
                         .rotationEffect(.degrees(logoRotation))
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: logoRotation)
                 }
-                .transition(.move(edge: .leading).combined(with: .opacity))
+
                 
                 Spacer()
                 
@@ -205,11 +219,9 @@ struct AnimatedHeader: View {
                 HStack(spacing: DeepRedDesign.Spacing.sm) {
                     // Search Button
                     Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            isSearchExpanded = true
-                        }
-                        // Auto-focus after animation starts
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        isSearchExpanded = true
+                        // Auto-focus immediately
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             isSearchFocused = true
                         }
                         HapticFeedback.impact(.light)
@@ -227,10 +239,8 @@ struct AnimatedHeader: View {
                     
                     // Notifications Button
                     Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            showNotifications = true
-                            notificationPulse = true
-                        }
+                        showNotifications = true
+                        notificationPulse = true
                         HapticFeedback.impact(.light)
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -248,7 +258,6 @@ struct AnimatedHeader: View {
                                         .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
                                 )
                                 .scaleEffect(notificationPulse ? 1.1 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: notificationPulse)
                             
                             // Notification Badge
                             Circle()
@@ -261,18 +270,15 @@ struct AnimatedHeader: View {
                                 )
                                 .offset(x: 10, y: -10)
                                 .scaleEffect(notificationPulse ? 1.2 : 1.0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: notificationPulse)
                         }
                     }
                 }
-                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
         .padding(.vertical, DeepRedDesign.Spacing.xs)
         .background(Color.white)
         .opacity(headerOpacity)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: headerOpacity)
         .dismissKeyboardOnBackgroundTap()
     }
 }
@@ -284,14 +290,32 @@ struct VideoFeedScrollView: View {
     @Binding var currentIndex: Int
     @Binding var refreshing: Bool
     let onScrollChanged: (CGFloat) -> Void
+    let headerView: (() -> AnyView)?
     
     @State private var cardPositions: [Int: CGFloat] = [:]
     @State private var scrollViewBounds: CGRect = .zero
+    @State private var lastScrollUpdate: Date = Date()
+    @State private var lastIndexUpdate: Date = Date()
+    @State private var scrollUpdateThrottle: TimeInterval = 0.15 // 150ms throttle for smoother performance
+    @State private var indexUpdateThrottle: TimeInterval = 0.3 // 300ms throttle for index updates
+    
+    init(videos: [VideoPost], currentIndex: Binding<Int>, refreshing: Binding<Bool>, onScrollChanged: @escaping (CGFloat) -> Void, headerView: (() -> AnyView)? = nil) {
+        self.videos = videos
+        self._currentIndex = currentIndex
+        self._refreshing = refreshing
+        self.onScrollChanged = onScrollChanged
+        self.headerView = headerView
+    }
     
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: DeepRedDesign.Spacing.md) {
+                    // Header View (if provided)
+                    if let headerView = headerView {
+                        headerView()
+                    }
+                    
                     // Pull to refresh indicator
                     if refreshing {
                         RefreshIndicator()
@@ -312,6 +336,7 @@ struct VideoFeedScrollView: View {
                                             updateCardPosition(index: index, geometry: geometry)
                                         }
                                         .onChange(of: geometry.frame(in: .named("scrollView")).midY) { _, newValue in
+                                            // Simplified position tracking for better performance
                                             updateCardPosition(index: index, geometry: geometry)
                                         }
                                 }
@@ -332,8 +357,18 @@ struct VideoFeedScrollView: View {
                                 scrollViewBounds = geometry.frame(in: .global)
                             }
                             .onChange(of: geometry.frame(in: .named("scrollView")).minY) { _, newValue in
-                                onScrollChanged(-newValue)
-                                updateCurrentIndexBasedOnScreenCenter()
+                                // Throttle scroll offset updates for smoother performance
+                                let now = Date()
+                                if now.timeIntervalSince(lastScrollUpdate) >= scrollUpdateThrottle {
+                                    lastScrollUpdate = now
+                                    onScrollChanged(-newValue)
+                                    
+                                    // Update current index less frequently for better performance
+                                    if now.timeIntervalSince(lastIndexUpdate) >= indexUpdateThrottle {
+                                        lastIndexUpdate = now
+                                        updateCurrentIndexBasedOnScreenCenter()
+                                    }
+                                }
                             }
                     }
                 )
@@ -355,9 +390,9 @@ struct VideoFeedScrollView: View {
         let frame = geometry.frame(in: .global)
         let newMidY = frame.midY
         
-        // Only update if position changed by more than 1pt to reduce unnecessary updates
+        // Only update if position changed by more than 8pt to reduce unnecessary updates
         if let currentMidY = cardPositions[index] {
-            if abs(newMidY - currentMidY) > 1.0 {
+            if abs(newMidY - currentMidY) > 8.0 {
                 cardPositions[index] = newMidY
             }
         } else {
@@ -380,17 +415,24 @@ struct VideoFeedScrollView: View {
         var bestIndex = currentIndex
         var smallestDistance = CGFloat.greatestFiniteMagnitude
         
-        for (index, cardCenterY) in cardPositions {
-            let distance = abs(cardCenterY - deviceScreenCenter)
-            
-            if distance < smallestDistance {
-                smallestDistance = distance
-                bestIndex = index
+        // Only check cards within a reasonable range of the current index for better performance
+        let searchRange = 3
+        let startIndex = max(0, currentIndex - searchRange)
+        let endIndex = min(videos.count - 1, currentIndex + searchRange)
+        
+        for index in startIndex...endIndex {
+            if let cardCenterY = cardPositions[index] {
+                let distance = abs(cardCenterY - deviceScreenCenter)
+                
+                if distance < smallestDistance {
+                    smallestDistance = distance
+                    bestIndex = index
+                }
             }
         }
         
-        // Update current index if we found a closer card
-        if bestIndex != currentIndex {
+        // Update current index if we found a closer card and it's significantly different
+        if bestIndex != currentIndex && smallestDistance < 100 {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                 currentIndex = bestIndex
             }
@@ -617,6 +659,7 @@ struct NotificationsView: View {
         .presentationDragIndicator(.visible)
     }
 }
+
 
 
 
