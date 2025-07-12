@@ -5,11 +5,13 @@ import SwiftUI
 struct NativeTabBar: View {
     @State private var selectedTab: TabItem = .home
     @State private var showCameraView = false
+    @State private var lastHomeTabTap: Date = Date()
+    @State private var refreshTrigger: Bool = false
     
     var body: some View {
         TabView(selection: $selectedTab) {
             // Home Tab
-            HomeFeedView()
+            HomeFeedView(refreshTrigger: $refreshTrigger)
                 .tabItem {
                     TabBarIcon(
                         item: .home,
@@ -62,19 +64,24 @@ struct NativeTabBar: View {
         .onAppear {
             configureTabBarAppearance()
         }
-        .onChange(of: selectedTab) { _, newValue in
-            // Haptic feedback on tab change
-            HapticFeedback.selection()
-            
-            // Special handling for record button - open camera directly
-            if newValue == .record {
-                // Open camera immediately
-                showCameraView = true
-                HapticFeedback.impact(.heavy)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            // Handle home tab double-tap for refresh (TikTok style)
+            if newValue == .home && oldValue == .home {
+                handleHomeTabDoubleTap()
+            } else {
+                // Haptic feedback on tab change
+                HapticFeedback.selection()
                 
-                // Reset to home tab so record tab doesn't stay selected
-                DispatchQueue.main.async {
-                    selectedTab = .home
+                // Special handling for record button - open camera directly
+                if newValue == .record {
+                    // Open camera immediately
+                    showCameraView = true
+                    HapticFeedback.impact(.heavy)
+                    
+                    // Reset to home tab so record tab doesn't stay selected
+                    DispatchQueue.main.async {
+                        selectedTab = .home
+                    }
                 }
             }
         }
@@ -83,6 +90,22 @@ struct NativeTabBar: View {
                 // Camera will automatically dismiss when done
             }
         }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func handleHomeTabDoubleTap() {
+        let now = Date()
+        let timeDifference = now.timeIntervalSince(lastHomeTabTap)
+        
+        // Double-tap threshold: 0.5 seconds (similar to TikTok)
+        if timeDifference < 0.5 {
+            // Trigger refresh
+            refreshTrigger.toggle()
+            HapticFeedback.impact(.medium)
+        }
+        
+        lastHomeTabTap = now
     }
     
     private func configureTabBarAppearance() {

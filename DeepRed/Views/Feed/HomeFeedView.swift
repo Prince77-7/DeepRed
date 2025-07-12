@@ -7,9 +7,9 @@ struct HomeFeedView: View {
     @State private var currentVideoIndex = 0
     @State private var showSearch = false
     @State private var showNotifications = false
-    @State private var refreshing = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showCameraView = false
+    @State private var isRefreshing = false
     
     // Pull-to-search state
     @State private var pullToSearchOffset: CGFloat = 0
@@ -17,9 +17,16 @@ struct HomeFeedView: View {
     @State private var pullToSearchText = ""
     @FocusState private var isPullToSearchFocused: Bool
     
+    // Refresh trigger from tab bar
+    @Binding private var refreshTrigger: Bool
+    
     private let videos = SampleData.sampleVideos
     private let headerHeight: CGFloat = 60
     private let maxPullOffset: CGFloat = 100 // Threshold for pull-to-search activation
+    
+    init(refreshTrigger: Binding<Bool> = .constant(false)) {
+        self._refreshTrigger = refreshTrigger
+    }
     
     var body: some View {
         NavigationStack {
@@ -45,10 +52,10 @@ struct HomeFeedView: View {
                     VideoFeedScrollView(
                         videos: videos,
                         currentIndex: $currentVideoIndex,
-                        refreshing: $refreshing,
                         pullToSearchOffset: $pullToSearchOffset,
                         showPullToSearch: $showPullToSearch,
                         maxPullOffset: maxPullOffset,
+                        refreshTrigger: refreshTrigger,
                         onScrollChanged: { offset in
                             scrollOffset = offset
                         }
@@ -130,6 +137,22 @@ struct HomeFeedView: View {
                         .padding(.bottom, DeepRedDesign.Spacing.screenMargin) // Seamless positioning above tab bar
                     }
                 }
+                
+                // Refresh Indicator Overlay
+                if isRefreshing {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            RefreshToastView()
+                                .padding(.trailing, DeepRedDesign.Spacing.screenMargin)
+                                .padding(.top, 100) // Position below header
+                            Spacer()
+                        }
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isRefreshing)
+                }
             }
         }
 
@@ -142,6 +165,31 @@ struct HomeFeedView: View {
             }
         }
         .environmentObject(appState)
+        .onChange(of: refreshTrigger) { _, _ in
+            // Triggered by double-tap on home tab
+            performRefresh()
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func performRefresh() {
+        guard !isRefreshing else { return }
+        
+        isRefreshing = true
+        
+        // Reset video index to top immediately for better UX
+        currentVideoIndex = 0
+        
+        // Simulate network delay for refresh completion
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isRefreshing = false
+            }
+            
+            // Success haptic feedback
+            HapticFeedback.notification(.success)
+        }
     }
     
     // Native header offset calculation
@@ -273,9 +321,6 @@ struct PullToSearchOverlay: View {
                     )
                 )
                 .ignoresSafeArea()
-                .onTapGesture {
-                    onDismiss()
-                }
             
             VStack(spacing: 24) {
                 // Search Field
@@ -309,7 +354,12 @@ struct PullToSearchOverlay: View {
                     )
                     
                     // Cancel Button
-                    Button(action: onDismiss) {
+                    Button(action: {
+                        // Dismiss keyboard immediately
+                        isSearchFocused = false
+                        // Then dismiss the overlay
+                        onDismiss()
+                    }) {
                         HStack {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .semibold))
@@ -508,10 +558,10 @@ struct AnimatedHeader: View {
 struct VideoFeedScrollView: View {
     let videos: [VideoPost]
     @Binding var currentIndex: Int
-    @Binding var refreshing: Bool
     @Binding var pullToSearchOffset: CGFloat
     @Binding var showPullToSearch: Bool
     let maxPullOffset: CGFloat
+    let refreshTrigger: Bool
     let onScrollChanged: (CGFloat) -> Void
     
     @State private var cardPositions: [Int: CGFloat] = [:]
@@ -522,12 +572,6 @@ struct VideoFeedScrollView: View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: DeepRedDesign.Spacing.md) {
-                    // Pull to refresh indicator
-                    if refreshing {
-                        RefreshIndicator()
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                    
                     // Video Cards
                     ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                         VideoCard(video: video, allVideos: videos, videoIndex: index)
@@ -577,15 +621,20 @@ struct VideoFeedScrollView: View {
                     }
                 )
             }
-            .refreshable {
-                await refreshFeed()
-            }
-            .onAppear {
-                // Scroll to current video on appear
-                if currentIndex < videos.count {
-                    proxy.scrollTo(videos[currentIndex].id, anchor: .center)
+                            .onAppear {
+                    // Scroll to current video on appear
+                    if currentIndex < videos.count {
+                        proxy.scrollTo(videos[currentIndex].id, anchor: .center)
+                    }
                 }
-            }
+                .onChange(of: refreshTrigger) { _, _ in
+                    // Scroll to top when refresh is triggered
+                    if !videos.isEmpty {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            proxy.scrollTo(videos[0].id, anchor: .top)
+                        }
+                    }
+                }
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
@@ -685,37 +734,21 @@ struct VideoFeedScrollView: View {
         }
     }
     
-    @MainActor
-    private func refreshFeed() async {
-        refreshing = true
-        
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-        
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-            refreshing = false
-        }
-        
-        HapticFeedback.notification(.success)
-    }
+
 }
 
-// MARK: - Refresh Indicator
 
-struct RefreshIndicator: View {
+
+// MARK: - Refresh Toast View
+
+struct RefreshToastView: View {
     @State private var rotation = 0.0
     
     var body: some View {
-        VStack(spacing: DeepRedDesign.Spacing.sm) {
-            Circle()
-                .stroke(DeepRedDesign.Colors.accent, lineWidth: 3)
-                .frame(width: 30, height: 30)
-                .overlay(
-                    Circle()
-                        .fill(DeepRedDesign.Colors.accent)
-                        .frame(width: 8, height: 8)
-                        .offset(x: 11)
-                )
+        HStack(spacing: DeepRedDesign.Spacing.xs) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white)
                 .rotationEffect(.degrees(rotation))
                 .onAppear {
                     withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
@@ -724,10 +757,20 @@ struct RefreshIndicator: View {
                 }
             
             Text("Refreshing...")
-                .font(DeepRedDesign.Typography.caption)
-                .foregroundColor(DeepRedDesign.Colors.accent)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white)
         }
-        .padding(.vertical, DeepRedDesign.Spacing.md)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.6))
+                )
+        )
+        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }
 
