@@ -96,7 +96,7 @@ struct ShortsVideoView: View {
     @State private var upvoteAnimation = false
     @State private var downvoteAnimation = false
     @State private var shareAnimation = false
-    @State private var followAnimation = false
+    @State private var collaborateAnimation = false
     @State private var isPlaying = false
     
     init(video: VideoPost, isCurrentVideo: Bool, onDismiss: @escaping () -> Void) {
@@ -202,18 +202,18 @@ struct ShortsVideoView: View {
                         
                         Spacer()
                         
-                        // Follow Button
+                        // Collaborate Button
                         Button(action: {
                             HapticFeedback.impact(.medium)
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                followAnimation = true
+                                collaborateAnimation = true
                             }
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                followAnimation = false
+                                collaborateAnimation = false
                             }
                         }) {
-                            Text("Follow")
+                            Text("Collaborate")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 16)
@@ -229,8 +229,8 @@ struct ShortsVideoView: View {
                                         )
                                 )
                         }
-                        .scaleEffect(followAnimation ? 0.95 : 1.0)
-                        .animation(.easeInOut(duration: 0.1), value: followAnimation)
+                        .scaleEffect(collaborateAnimation ? 0.95 : 1.0)
+                        .animation(.easeInOut(duration: 0.1), value: collaborateAnimation)
                     }
                     .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
                     .padding(.top, 60) // Safe area padding for status bar/notch

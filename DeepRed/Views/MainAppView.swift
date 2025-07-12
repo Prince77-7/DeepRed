@@ -82,74 +82,7 @@ struct InboxView: View {
 
 struct ProfileView: View {
     var body: some View {
-        NavigationStack {
-            ZStack {
-                DeepRedDesign.Colors.primaryBackground
-                    .ignoresSafeArea()
-                
-                VStack(spacing: DeepRedDesign.Spacing.md) {
-                    // Header
-                    HStack {
-                        Text("Profile")
-                            .font(DeepRedDesign.Typography.title1)
-                            .primaryText()
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            // Handle settings
-                            HapticFeedback.impact(.light)
-                        }) {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 24, weight: .medium))
-                                .foregroundColor(DeepRedDesign.Colors.onyx)
-                        }
-                    }
-                    .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
-                    .padding(.top, DeepRedDesign.Spacing.sm)
-                    
-                    // Content
-                    VStack(spacing: DeepRedDesign.Spacing.lg) {
-                        // Profile Picture
-                        Circle()
-                            .fill(DeepRedDesign.Colors.ash)
-                            .frame(width: 120, height: 120)
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 50, weight: .medium))
-                                    .foregroundColor(DeepRedDesign.Colors.graphite)
-                            )
-                        
-                        VStack(spacing: DeepRedDesign.Spacing.sm) {
-                            Text("Your Profile")
-                                .font(DeepRedDesign.Typography.displayTitle)
-                                .primaryText()
-                            
-                            Text("Showcase your talents and connect with opportunities")
-                                .font(DeepRedDesign.Typography.body)
-                                .secondaryText()
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, DeepRedDesign.Spacing.md)
-                        }
-                        
-                        VStack(spacing: DeepRedDesign.Spacing.sm) {
-                            SecondaryButton("Edit Profile") {
-                                // Handle edit profile
-                                HapticFeedback.impact(.light)
-                            }
-                            .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
-                            
-                            TertiaryButton("View Public Profile") {
-                                // Handle view public profile
-                                HapticFeedback.impact(.light)
-                            }
-                            .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-        }
+        EnhancedProfileView()
     }
 }
 

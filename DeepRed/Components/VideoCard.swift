@@ -122,11 +122,11 @@ struct VideoCard: View {
                     
                     Spacer()
                     
-                    // Premium Follow Button
+                    // Premium Collaborate Button
                     Button(action: {
                         HapticFeedback.impact(.medium)
                     }) {
-                        Text("Follow")
+                        Text("Collaborate")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
@@ -402,8 +402,8 @@ struct UserProfileSheet: View {
                     
                     Spacer()
                     
-                    Button("Follow") {
-                        // Handle follow
+                    Button("Collaborate") {
+                        // Handle collaborate
                     }
                     .foregroundColor(DeepRedDesign.Colors.accent)
                 }
@@ -454,7 +454,7 @@ struct UserProfileSheet: View {
                                     .font(DeepRedDesign.Typography.bodyBold)
                                     .primaryText()
                                 
-                                Text("Followers")
+                                Text("Collaborators")
                                     .font(DeepRedDesign.Typography.caption)
                                     .secondaryText()
                             }
@@ -464,7 +464,7 @@ struct UserProfileSheet: View {
                                     .font(DeepRedDesign.Typography.bodyBold)
                                     .primaryText()
                                 
-                                Text("Following")
+                                Text("Collaborating")
                                     .font(DeepRedDesign.Typography.caption)
                                     .secondaryText()
                             }
