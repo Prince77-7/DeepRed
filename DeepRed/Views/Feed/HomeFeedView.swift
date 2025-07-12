@@ -83,18 +83,7 @@ struct HomeFeedView: View {
                 }
                 //.animation(.spring(response: 0.5, dampingFraction: 0.75), value: shouldShowNavigation)
                 
-                // Floating Record Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        FloatingRecordButton {
-                            showCameraView = true
-                        }
-                        .padding(.trailing, DeepRedDesign.Spacing.screenMargin)
-                        .padding(.bottom, DeepRedDesign.Spacing.screenMargin) // Seamless positioning above tab bar
-                    }
-                }
+
             }
         }
 

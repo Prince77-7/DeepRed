@@ -317,6 +317,7 @@ struct VideoCard: View {
         }
         .fullScreenCover(isPresented: $showShortsViewer) {
             ShortsViewer(videos: allVideos.isEmpty ? [video] : allVideos, initialIndex: videoIndex)
+                .transition(.opacity)
         }
     }
 }

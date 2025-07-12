@@ -12,16 +12,16 @@ struct CameraRecordButton: View {
             // Progress Ring (when recording)
             if isRecording {
                 Circle()
-                    .stroke(.white.opacity(0.3), lineWidth: 6)
-                    .frame(width: 90, height: 90)
+                    .stroke(.white.opacity(0.3), lineWidth: 4)
+                    .frame(width: 70, height: 70)
                 
                 Circle()
                     .trim(from: 0, to: recordingProgress)
                     .stroke(
                         DeepRedDesign.Colors.accent,
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
                     )
-                    .frame(width: 90, height: 90)
+                    .frame(width: 70, height: 70)
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 0.1), value: recordingProgress)
             }
@@ -33,23 +33,23 @@ struct CameraRecordButton: View {
                 ZStack {
                     // Outer Ring (thin stroke)
                     Circle()
-                        .stroke(DeepRedDesign.Colors.accent, lineWidth: 3)
-                        .frame(width: 80, height: 80)
+                        .stroke(DeepRedDesign.Colors.accent, lineWidth: 2)
+                        .frame(width: 60, height: 60)
                         .shadow(
                             color: DeepRedDesign.Colors.accent.opacity(0.4),
-                            radius: 12,
+                            radius: 8,
                             x: 0,
-                            y: 6
+                            y: 4
                         )
                     
                     // Inner Circle (thick, solid)
                     Circle()
                         .fill(DeepRedDesign.Colors.accent)
                         .frame(
-                            width: isRecording ? 32 : 56,
-                            height: isRecording ? 32 : 56
+                            width: isRecording ? 24 : 44,
+                            height: isRecording ? 24 : 44
                         )
-                        .cornerRadius(isRecording ? 6 : 28)
+                        .cornerRadius(isRecording ? 4 : 22)
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isRecording)
                 }
             }

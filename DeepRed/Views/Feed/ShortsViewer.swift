@@ -55,7 +55,6 @@ struct ShortsViewer: View {
             }
             .ignoresSafeArea()
         }
-        .scaleEffect(isDismissing ? 0.9 : 1.0)
         .opacity(isDismissing ? 0 : 1)
         .animation(.easeInOut(duration: 0.3), value: isDismissing)
         .onAppear {
@@ -156,6 +155,7 @@ struct ShortsVideoView: View {
                             .animation(.easeInOut(duration: 0.3), value: isPlaying)
                     }
                 }
+
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isPlaying.toggle()
@@ -414,7 +414,7 @@ struct ShortsVideoView: View {
         }
         .onTapGesture(count: 2) {
             // Double-tap anywhere to go back to home screen
-            HapticFeedback.impact(.medium)
+            HapticFeedback.impact(.light)
             onDismiss()
         }
     }
