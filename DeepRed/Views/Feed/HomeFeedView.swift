@@ -11,8 +11,15 @@ struct HomeFeedView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var showCameraView = false
     
+    // Pull-to-search state
+    @State private var pullToSearchOffset: CGFloat = 0
+    @State private var showPullToSearch = false
+    @State private var pullToSearchText = ""
+    @FocusState private var isPullToSearchFocused: Bool
+    
     private let videos = SampleData.sampleVideos
     private let headerHeight: CGFloat = 60
+    private let maxPullOffset: CGFloat = 100 // Threshold for pull-to-search activation
     
     var body: some View {
         NavigationStack {
@@ -34,38 +41,81 @@ struct HomeFeedView: View {
                     .clipped()
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: headerOffset)
                     
-                    // Video Feed
+                    // Video Feed with Pull-to-Search
                     VideoFeedScrollView(
                         videos: videos,
                         currentIndex: $currentVideoIndex,
                         refreshing: $refreshing,
+                        pullToSearchOffset: $pullToSearchOffset,
+                        showPullToSearch: $showPullToSearch,
+                        maxPullOffset: maxPullOffset,
                         onScrollChanged: { offset in
                             scrollOffset = offset
                         }
                     )
                 }
                 
-                // Dreamy Top Shadow Overlay
-                VStack {
-                    // Organic shadow gradient that fades naturally
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: Color.black.opacity(0.25 * scrollProgress), location: 0.0),
-                            .init(color: Color.black.opacity(0.20 * scrollProgress), location: 0.1),
-                            .init(color: Color.black.opacity(0.12 * scrollProgress), location: 0.25),
-                            .init(color: Color.black.opacity(0.06 * scrollProgress), location: 0.45),
-                            .init(color: Color.black.opacity(0.02 * scrollProgress), location: 0.65),
-                            .init(color: Color.black.opacity(0.005 * scrollProgress), location: 0.8),
-                            .init(color: Color.clear, location: 1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
+                // Pull-to-Search Indicator
+                if !showPullToSearch && pullToSearchOffset > 0 {
+                    PullToSearchIndicator(
+                        offset: pullToSearchOffset,
+                        maxOffset: maxPullOffset
                     )
-                    .frame(height: 80)
-                    .ignoresSafeArea(.all, edges: .top)
-                    .animation(.easeInOut(duration: 0.25), value: scrollProgress)
-                    
-                    Spacer()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .offset(y: max(0, pullToSearchOffset - 40))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: pullToSearchOffset)
+                }
+                
+                // Dark Mode Search Overlay
+                if showPullToSearch {
+                    PullToSearchOverlay(
+                        searchText: $pullToSearchText,
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                showPullToSearch = false
+                                pullToSearchText = ""
+                                pullToSearchOffset = 0
+                            }
+                        }
+                    )
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+                }
+                
+                // Adaptive Fading Overlay - appears when header disappears
+                if scrollProgress > 0.1 {
+                    VStack {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .mask {
+                                // Create soft fade that disappears before hitting frame edge
+                                LinearGradient(
+                                    gradient: Gradient(stops: [
+                                        .init(color: .black, location: 0.0),
+                                        .init(color: .black.opacity(0.95), location: 0.1),
+                                        .init(color: .black.opacity(0.85), location: 0.2),
+                                        .init(color: .black.opacity(0.7), location: 0.3),
+                                        .init(color: .black.opacity(0.5), location: 0.45),
+                                        .init(color: .black.opacity(0.3), location: 0.6),
+                                        .init(color: .black.opacity(0.15), location: 0.75),
+                                        .init(color: .black.opacity(0.05), location: 0.85),
+                                        .init(color: .clear, location: 0.95),
+                                        .init(color: .clear, location: 1.0)
+                                    ]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            }
+                            .frame(height: 120)
+                            .ignoresSafeArea(.all, edges: .top)
+                            .opacity(scrollProgress)
+                            .animation(.easeInOut(duration: 0.3), value: scrollProgress)
+                        
+                        Spacer()
+                    }
+                    .transition(.opacity)
                 }
                 
                 // Floating Record Button
@@ -111,12 +161,188 @@ struct HomeFeedView: View {
         return 1.0 - easedProgress
     }
     
-    // Scroll progress for dreamy overlay
+    // Scroll progress for adaptive overlay
     private var scrollProgress: Double {
         let threshold: CGFloat = 80
         let progress = min(max(scrollOffset / threshold, 0), 1)
-        // Smooth curve for dreamy effect
+        // Smooth curve for overlay effect
         return progress * progress * (3.0 - 2.0 * progress)
+    }
+}
+
+// MARK: - Pull-to-Search Indicator
+
+struct PullToSearchIndicator: View {
+    let offset: CGFloat
+    let maxOffset: CGFloat
+    
+    @State private var rotationAngle: Double = 0
+    
+    private var progress: CGFloat {
+        min(offset / maxOffset, 1.0)
+    }
+    
+    private var circleSize: CGFloat {
+        min(offset / 2, 40)
+    }
+    
+    private var isActivated: Bool {
+        progress >= 0.8
+    }
+    
+    var body: some View {
+        VStack {
+            if offset > 10 {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                isActivated ? Color.white : Color.gray.opacity(0.8),
+                                isActivated ? Color.gray.opacity(0.1) : Color.gray.opacity(0.3)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: circleSize, height: circleSize)
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                isActivated ? Color.white.opacity(0.5) : Color.gray.opacity(0.3),
+                                lineWidth: 2
+                            )
+                    )
+                    .overlay(
+                        Group {
+                            if offset > 30 {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: min(circleSize * 0.4, 16), weight: .semibold))
+                                    .foregroundColor(
+                                        isActivated ? Color.black : Color.gray.opacity(0.7)
+                                    )
+                                    .scaleEffect(min(1.0, (offset - 30) / 30))
+                                    .rotationEffect(.degrees(rotationAngle))
+                            }
+                        }
+                    )
+                    .shadow(
+                        color: isActivated ? Color.white.opacity(0.3) : Color.black.opacity(0.1),
+                        radius: isActivated ? 8 : 4,
+                        x: 0,
+                        y: 2
+                    )
+                    .scaleEffect(isActivated ? 1.1 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActivated)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: circleSize)
+                    .onChange(of: isActivated) { _, newValue in
+                        if newValue {
+                            withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
+                                rotationAngle = 360
+                            }
+                            HapticFeedback.impact(.medium)
+                        }
+                    }
+                    .padding(.top, 60)
+            }
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Pull-to-Search Overlay
+
+struct PullToSearchOverlay: View {
+    @Binding var searchText: String
+    @FocusState private var isSearchFocused: Bool
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        ZStack {
+            // Native dreamy background with subtle blur
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.white.opacity(0.1),
+                            Color.gray.opacity(0.05),
+                            Color.white.opacity(0.15)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .ignoresSafeArea()
+                .onTapGesture {
+                    onDismiss()
+                }
+            
+            VStack(spacing: 24) {
+                // Search Field
+                VStack(spacing: 16) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(DeepRedDesign.Colors.graphite)
+                        
+                        TextField("Search creators, videos...", text: $searchText)
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundColor(DeepRedDesign.Colors.onyx)
+                            .focused($isSearchFocused)
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .submitLabel(.search)
+                            .onSubmit {
+                                // Handle search submission
+                                performSearch()
+                            }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 25)
+                            .fill(.regularMaterial)
+                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 25)
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+                    
+                    // Cancel Button
+                    Button(action: onDismiss) {
+                        HStack {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Cancel")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(DeepRedDesign.Colors.graphite)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(.thinMaterial)
+                        )
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 80)
+                
+                Spacer()
+            }
+        }
+        .onAppear {
+            // Auto-focus search field with slight delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isSearchFocused = true
+            }
+        }
+    }
+    
+    private func performSearch() {
+        // Implement search logic here
+        HapticFeedback.impact(.light)
+        onDismiss()
     }
 }
 
@@ -283,10 +509,14 @@ struct VideoFeedScrollView: View {
     let videos: [VideoPost]
     @Binding var currentIndex: Int
     @Binding var refreshing: Bool
+    @Binding var pullToSearchOffset: CGFloat
+    @Binding var showPullToSearch: Bool
+    let maxPullOffset: CGFloat
     let onScrollChanged: (CGFloat) -> Void
     
     @State private var cardPositions: [Int: CGFloat] = [:]
     @State private var scrollViewBounds: CGRect = .zero
+    @State private var isDragging = false
     
     var body: some View {
         ScrollViewReader { proxy in
@@ -325,6 +555,7 @@ struct VideoFeedScrollView: View {
                     }
                 }
                 .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
+                .padding(.top, max(0, pullToSearchOffset))
                 .background(
                     GeometryReader { geometry in
                         Color.clear
@@ -332,8 +563,16 @@ struct VideoFeedScrollView: View {
                                 scrollViewBounds = geometry.frame(in: .global)
                             }
                             .onChange(of: geometry.frame(in: .named("scrollView")).minY) { _, newValue in
-                                onScrollChanged(-newValue)
+                                let offset = -newValue
+                                onScrollChanged(offset)
                                 updateCurrentIndexBasedOnScreenCenter()
+                                
+                                // Handle pull-to-search gesture
+                                if offset < 0 && !showPullToSearch {
+                                    pullToSearchOffset = min(abs(offset), maxPullOffset)
+                                } else if !isDragging {
+                                    pullToSearchOffset = 0
+                                }
                             }
                     }
                 )
@@ -347,6 +586,33 @@ struct VideoFeedScrollView: View {
                     proxy.scrollTo(videos[currentIndex].id, anchor: .center)
                 }
             }
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        isDragging = true
+                        
+                        // Only handle downward pulls at the top
+                        if value.translation.height > 0 && scrollViewBounds.minY >= 0 {
+                            pullToSearchOffset = min(value.translation.height * 0.6, maxPullOffset)
+                        }
+                    }
+                    .onEnded { value in
+                        isDragging = false
+                        
+                        if pullToSearchOffset >= maxPullOffset * 0.8 {
+                            // Activate pull-to-search
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                showPullToSearch = true
+                            }
+                            HapticFeedback.impact(.medium)
+                        } else {
+                            // Reset pull indicator
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                pullToSearchOffset = 0
+                            }
+                        }
+                    }
+            )
             .coordinateSpace(name: "scrollView")
         }
     }
