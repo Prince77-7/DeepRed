@@ -52,8 +52,8 @@ struct HomeFeedView: View {
                             .init(color: Color.black.opacity(0.70 * scrollProgress), location: 0.0),
                             .init(color: Color.black.opacity(0.50 * scrollProgress), location: 0.1),
                             .init(color: Color.black.opacity(0.40 * scrollProgress), location: 0.25),
-                            .init(color: Color.black.opacity(0.06 * scrollProgress), location: 0.45),
-                            .init(color: Color.black.opacity(0.02 * scrollProgress), location: 0.65),
+                            .init(color: Color.black.opacity(0.20 * scrollProgress), location: 0.45),
+                            .init(color: Color.black.opacity(0.10 * scrollProgress), location: 0.65),
                             .init(color: Color.clear.opacity(0.005 * scrollProgress), location: 0.8),
                             .init(color: Color.clear, location: 1.0)
                         ]),
@@ -61,28 +61,17 @@ struct HomeFeedView: View {
                         endPoint: .bottom
                     )
                     .frame(height: 80)
-                    .ignoresSafeArea(.all, edges: .top)
-                    .animation(.easeInOut(duration: 0.25), value: scrollProgress)
-                    
-                    Spacer()
-                }
-                
+                    .opacity(Double(min(scrollProgress, 1)))
+                    .ignoresSafeArea(edges: .top)
+                       Spacer()
+                      }
+             
                 // Top Navigation Bar (appears while scrolling) - Empty/clean
                 VStack {
                     if shouldShowNavigation {
                         Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color.black.opacity(0.8),
-                                        Color.clear
-                                    ]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .fill(Color.clear)
                             .frame(height: navigationHeight)
-                            .blur(radius: 0.5)
                             .ignoresSafeArea()
                         .transition(.asymmetric(
                             insertion: .move(edge: .top).combined(with: .opacity),
@@ -282,6 +271,18 @@ struct AnimatedHeader: View {
         .opacity(headerOpacity)
         .dismissKeyboardOnBackgroundTap()
     }
+}
+
+
+
+struct BlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style = .systemMaterial
+
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
 
 // MARK: - Video Feed Scroll View
