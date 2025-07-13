@@ -20,6 +20,10 @@ struct CameraRecordingView: View {
     @StateObject private var cameraManager = CameraManager()
     @State private var recordingTimer: Timer?
     
+    // Gesture handling
+    @State private var tapCount = 0
+    @State private var tapTimer: Timer?
+    
     private let maxRecordingTime: TimeInterval = 30.0
     
     var body: some View {
@@ -31,13 +35,8 @@ struct CameraRecordingView: View {
             // Camera Preview
             CameraPreviewUIView(cameraManager: cameraManager)
                 .ignoresSafeArea()
-                .onTapGesture(count: 2) {
-                    // Double tap to switch camera
-                    switchCamera()
-                }
                 .onTapGesture {
-                    // Single tap to focus (placeholder)
-                    HapticFeedback.impact(.light)
+                    handleTap()
                 }
             
             // UI Overlay
@@ -77,7 +76,6 @@ struct CameraRecordingView: View {
                                     .blur(radius: 0.5)
                             )
                     }
-                    .disabled(isRecording)
                 }
                 .padding(.horizontal, DeepRedDesign.Spacing.screenMargin)
                 .padding(.top, DeepRedDesign.Spacing.md)
@@ -131,6 +129,8 @@ struct CameraRecordingView: View {
         }
         .onDisappear {
             cameraManager.cleanup()
+            tapTimer?.invalidate()
+            tapTimer = nil
         }
         .fullScreenCover(isPresented: $showPostView, onDismiss: {
             dismiss()
@@ -166,6 +166,27 @@ struct CameraRecordingView: View {
         currentCamera = useBackCamera ? .back : .front
         cameraManager.setupCamera(position: currentCamera)
         HapticFeedback.impact(.light)
+    }
+    
+    private func handleTap() {
+        tapCount += 1
+        
+        // Cancel any existing timer
+        tapTimer?.invalidate()
+        
+        // Set a timer to handle the tap after a delay
+        tapTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+            if tapCount == 1 {
+                // Single tap - focus (placeholder)
+                HapticFeedback.impact(.light)
+            } else if tapCount >= 2 {
+                // Double tap - switch camera
+                switchCamera()
+            }
+            
+            // Reset tap count
+            tapCount = 0
+        }
     }
     
     private func switchCamera() {
@@ -252,15 +273,14 @@ class CameraManager: ObservableObject {
     func setupCamera(position: CameraPosition) {
         print("📹 Setting up camera session for position: \(position)")
         
-        // Set not running immediately
-        isSessionRunning = false
-        
-        // Stop existing session
-        captureSession?.stopRunning()
-        
         currentPosition = position
         
-        let session = AVCaptureSession()
+        // Create session if it doesn't exist
+        if captureSession == nil {
+            captureSession = AVCaptureSession()
+        }
+        
+        guard let session = captureSession else { return }
         
         // Configure session on background thread
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -283,11 +303,13 @@ class CameraManager: ObservableObject {
                 position: position == .front ? .front : .back
             ) else { 
                 print("❌ Could not get capture device")
+                session.commitConfiguration()
                 return 
             }
             
             guard let videoInput = try? AVCaptureDeviceInput(device: captureDevice) else { 
                 print("❌ Could not create video input")
+                session.commitConfiguration()
                 return 
             }
             
@@ -296,20 +318,21 @@ class CameraManager: ObservableObject {
                 print("✅ Added video input")
             }
             
-            // Add audio input
-            guard let audioDevice = AVCaptureDevice.default(for: .audio) else { 
-                print("❌ Could not get audio device")
-                return 
-            }
-            
-            guard let audioInput = try? AVCaptureDeviceInput(device: audioDevice) else { 
-                print("❌ Could not create audio input")
-                return 
-            }
-            
-            if session.canAddInput(audioInput) {
-                session.addInput(audioInput)
-                print("✅ Added audio input")
+            // Add audio input (with error handling)
+            if let audioDevice = AVCaptureDevice.default(for: .audio) {
+                do {
+                    let audioInput = try AVCaptureDeviceInput(device: audioDevice)
+                    if session.canAddInput(audioInput) {
+                        session.addInput(audioInput)
+                        print("✅ Added audio input")
+                    } else {
+                        print("⚠️ Cannot add audio input to session")
+                    }
+                } catch {
+                    print("⚠️ Failed to create audio input: \(error.localizedDescription)")
+                }
+            } else {
+                print("⚠️ Could not get audio device")
             }
             
             // Setup movie file output
@@ -335,14 +358,15 @@ class CameraManager: ObservableObject {
             session.commitConfiguration()
             
             DispatchQueue.main.async {
-                self?.captureSession = session
                 self?.videoOutput = movieOutput
                 self?.currentPosition = position
                 self?.cameraPosition = position
             }
             
-            // Start session
-            session.startRunning()
+            // Start session if not already running
+            if !session.isRunning {
+                session.startRunning()
+            }
             
             DispatchQueue.main.async {
                 self?.isSessionRunning = session.isRunning
@@ -433,12 +457,15 @@ struct CameraPreviewUIView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        // Only set up if we haven't already and session is running
-        if context.coordinator.previewLayer == nil,
-           let session = cameraManager.getSession(),
-           cameraManager.isSessionRunning {
+        // Get current session
+        guard let session = cameraManager.getSession() else { return }
+        
+        // Set up or update preview layer
+        if context.coordinator.previewLayer == nil {
             context.coordinator.setupPreviewLayerOnce(with: session, in: uiView)
-            context.coordinator.updatePreviewMirroring(for: cameraManager.getCurrentPosition())
+        } else {
+            // Update existing preview layer with new session
+            context.coordinator.updatePreviewLayer(with: session)
         }
         
         // Update frame if preview layer exists
@@ -472,6 +499,16 @@ struct CameraPreviewUIView: UIViewRepresentable {
             self.previewLayer = newPreviewLayer
             
             print("✅ Preview layer setup complete")
+        }
+        
+        func updatePreviewLayer(with session: AVCaptureSession) {
+            guard let previewLayer = previewLayer else { return }
+            
+            // Update the preview layer's session
+            if previewLayer.session != session {
+                print("🔄 Updating preview layer with new session")
+                previewLayer.session = session
+            }
         }
         
         func updatePreviewMirroring(for position: CameraPosition) {

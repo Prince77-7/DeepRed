@@ -377,6 +377,32 @@
 - **User Experience**: Profile now feels more spacious and focused without unnecessary text descriptions
 - **Status**: Complete
 
+### ✅ Fixed Camera Preview Double Tap Gesture for Camera Switching
+- **Task**: Fixed double tap gesture conflict and camera session management issues in CameraRecordingView
+- **Problem**: Multiple issues were preventing camera switching:
+  - Gesture conflict between single tap (focus) and double tap (camera switch)
+  - Camera session being recreated on each switch causing preview layer disconnection
+  - Audio session errors during camera switching
+- **Solution**: 
+  - **Gesture Handling**: Replaced conflicting .onTapGesture modifiers with state-based tap counting system
+  - **Session Management**: Modified setupCamera to reuse existing session instead of creating new one
+  - **Preview Layer**: Added updatePreviewLayer method to properly handle session updates
+  - **Audio Handling**: Added proper error handling for audio input to prevent session errors
+  - **Recording Support**: Enabled camera switching during recording for creative video effects
+- **Implementation Details**:
+  - Gesture: @State private var tapCount and tapTimer with 0.3 second delay for disambiguation
+  - Session: Reuse existing AVCaptureSession, only reconfigure inputs/outputs
+  - Preview: Dynamic preview layer session updating in updateUIView
+  - Audio: Try-catch error handling for audio input creation
+  - Recording: Removed restrictions, camera switch button enabled during recording
+- **Result**: 
+  - Users can now double tap the camera preview to switch between front and back cameras
+  - Camera preview stays connected during switching (no black screen)
+  - No more audio session errors during camera switching
+  - Camera switching works during recording for creative video transitions
+  - Single tap still works for focus feedback
+- **Status**: Complete
+
 ## Future Enhancements
 
 ### 🎥 Real Camera Integration
