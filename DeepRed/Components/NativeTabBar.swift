@@ -1,98 +1,99 @@
 import SwiftUI
 
-// MARK: - Native Tab Bar Implementation
+// MARK: - App Router for Navigation
+class AppRouter: ObservableObject {
+    @Published var selectedTab: TabItem = .home
+}
+
+// MARK: - Native Tab Bar Implementation with Compose Overlay Support
 
 struct NativeTabBar: View {
-    @State private var selectedTab: TabItem = .home
-    @State private var showCameraView = false
+    @StateObject private var router = AppRouter()
+    @State private var showComposeOverlay = false
     @State private var lastHomeTabTap: Date = Date()
     @State private var refreshTrigger: Bool = false
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Home Tab
-            HomeFeedView(refreshTrigger: $refreshTrigger)
-                .tabItem {
-                    TabBarIcon(
-                        item: .home,
-                        isSelected: selectedTab == .home
-                    )
+        ZStack {
+            TabView(selection: $router.selectedTab) {
+                ForEach(TabItem.allCases, id: \.self) { tab in
+                    TabRootView(tab: tab)
+                        .tabItem {
+                            if tab == .record {
+                                Image(systemName: "")
+                                    .hidden() // Completely hide original icon
+                            } else {
+                                Image(systemName: router.selectedTab == tab ? tab.iconFilled : tab.icon)
+                                Text(tab.title)
+                            }
+                        }
+                        .tag(tab)
                 }
-                .tag(TabItem.home)
+            }
+            .tint(DeepRedDesign.Colors.accent)
+            .onAppear {
+                configureTabBarAppearance()
+            }
+            .onChange(of: router.selectedTab) { oldValue, newValue in
+                handleTabChange(from: oldValue, to: newValue)
+            }
             
-            // Services Tab
-            ServicesView()
-                .tabItem {
-                    TabBarIcon(
-                        item: .services,
-                        isSelected: selectedTab == .services
-                    )
-                }
-                .tag(TabItem.services)
-            
-            // Record Tab (Special Handling)
-            RecordView()
-                .tabItem {
-                    TabBarIcon(
-                        item: .record,
-                        isSelected: selectedTab == .record
-                    )
-                }
-                .tag(TabItem.record)
-            
-            // Inbox Tab
-            InboxView()
-                .tabItem {
-                    TabBarIcon(
-                        item: .inbox,
-                        isSelected: selectedTab == .inbox
-                    )
-                }
-                .tag(TabItem.inbox)
-            
-            // Profile Tab
-            ProfileView()
-                .tabItem {
-                    TabBarIcon(
-                        item: .profile,
-                        isSelected: selectedTab == .profile
-                    )
-                }
-                .tag(TabItem.profile)
-        }
-        .tint(DeepRedDesign.Colors.accent) // iOS 15+ tint for selected state
-        .onAppear {
-            configureTabBarAppearance()
-        }
-        .onChange(of: selectedTab) { oldValue, newValue in
-            // Handle home tab double-tap for refresh (TikTok style)
-            if newValue == .home && oldValue == .home {
-                handleHomeTabDoubleTap()
-            } else {
-                // Haptic feedback on tab change
-                HapticFeedback.selection()
-                
-                // Special handling for record button - open camera directly
-                if newValue == .record {
-                    // Open camera immediately
-                    showCameraView = true
-                    HapticFeedback.impact(.heavy)
+            // Custom Red Record Icon Overlay
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Spacer()
                     
-                    // Reset to home tab so record tab doesn't stay selected
-                    DispatchQueue.main.async {
-                        selectedTab = .home
+                    // Position red icon over middle tab
+                    ZStack {
+                        // Outer circle outline
+                        Circle()
+                            .stroke(DeepRedDesign.Colors.accent, lineWidth: 2)
+                            .frame(width: 42, height: 42)
+                        
+                        // Inner filled circle
+                        Circle()
+                            .fill(DeepRedDesign.Colors.accent)
+                            .frame(width: 36, height: 36)
                     }
+                    .allowsHitTesting(false) // Allow taps to pass through to tab bar
+                    
+                    Spacer()
+                    Spacer()
                 }
+                .padding(.bottom, 2) // Fine-tune alignment with other tab icons
             }
+            
+            ComposeOverlay(isPresented: $showComposeOverlay)
         }
-        .fullScreenCover(isPresented: $showCameraView) {
-            CameraRecordingView(useBackCamera: false) {
-                // Camera will automatically dismiss when done
-            }
-        }
+        .environmentObject(router)
     }
     
     // MARK: - Helper Functions
+    
+    private func handleTabChange(from oldValue: TabItem, to newValue: TabItem) {
+        // Handle home tab double-tap for refresh (TikTok style)
+        if newValue == .home && oldValue == .home {
+            handleHomeTabDoubleTap()
+        } else {
+            // Haptic feedback on tab change
+            HapticFeedback.selection()
+            
+            // Special handling for record button - show compose overlay
+            if newValue == .record {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showComposeOverlay = true
+                }
+                HapticFeedback.impact(.heavy)
+                
+                // Reset to previous tab so record tab doesn't stay selected
+                DispatchQueue.main.async {
+                    router.selectedTab = oldValue
+                }
+            }
+        }
+    }
     
     private func handleHomeTabDoubleTap() {
         let now = Date()
@@ -136,10 +137,9 @@ struct NativeTabBar: View {
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
         
-        // iOS 15+ additional configuration
-        if #available(iOS 15.0, *) {
-            UITabBar.appearance().scrollEdgeAppearance = appearance
-        }
+        // Force red color for all states
+        UITabBar.appearance().tintColor = UIColor(DeepRedDesign.Colors.accent)
+        UITabBar.appearance().unselectedItemTintColor = UIColor(DeepRedDesign.Colors.graphite)
     }
     
     private func createShadowImage() -> UIImage? {
@@ -154,6 +154,108 @@ struct NativeTabBar: View {
     }
 }
 
+// MARK: - Tab Root View Component
+
+struct TabRootView: View {
+    let tab: TabItem
+    @EnvironmentObject var router: AppRouter
+    
+    var body: some View {
+        switch tab {
+        case .home:
+            HomeFeedView()
+        case .services:
+            ServicesView()
+        case .record:
+            // This won't be shown as the record tab triggers compose overlay
+            Color.clear
+        case .inbox:
+            InboxView()
+        case .profile:
+            ProfileView()
+        }
+    }
+}
+
+// MARK: - Compose Overlay Component
+
+struct ComposeOverlay: View {
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        if isPresented {
+            ZStack {
+                // Dreamy Glassmorphism Background - Full Screen Focus Effect
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .background(
+                        // Multi-layer dreamy gradient for depth
+                        ZStack {
+                            // Base gradient layer
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.1),
+                                    Color.gray.opacity(0.05),
+                                    Color.black.opacity(0.3),
+                                    Color.gray.opacity(0.05),
+                                    Color.white.opacity(0.1)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            
+                            // Radial gradient overlay for center focus
+                            RadialGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: .clear, location: 0.0),
+                                    .init(color: .black.opacity(0.1), location: 0.3),
+                                    .init(color: .black.opacity(0.2), location: 0.5),
+                                    .init(color: .black.opacity(0.4), location: 0.7),
+                                    .init(color: .black.opacity(0.6), location: 1.0)
+                                ]),
+                                center: .center,
+                                startRadius: 100,
+                                endRadius: 400
+                            )
+                        }
+                    )
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isPresented = false
+                        }
+                    }
+                
+                // Camera Recording View
+                CameraRecordingView(useBackCamera: false) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        isPresented = false
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .padding(20)
+                .shadow(
+                    color: .black.opacity(0.3),
+                    radius: 20,
+                    x: 0,
+                    y: 10
+                )
+                .shadow(
+                    color: .white.opacity(0.1),
+                    radius: 10,
+                    x: 0,
+                    y: -5
+                )
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .opacity)
+                ))
+            }
+            .zIndex(1000)
+        }
+    }
+}
+
 // MARK: - Tab Bar Icon Component
 
 struct TabBarIcon: View {
@@ -162,19 +264,13 @@ struct TabBarIcon: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            if item == .record {
-                // Special Record Button
-                RecordTabIcon(isSelected: isSelected)
-            } else {
-                // Standard Tab Icon
-                Image(systemName: isSelected ? item.iconFilled : item.icon)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundColor(iconColor)
-                
-                Text(item.rawValue)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                    .foregroundColor(iconColor)
-            }
+            Image(systemName: isSelected ? item.iconFilled : item.icon)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundColor(iconColor)
+            
+            Text(item.title)
+                .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                .foregroundColor(iconColor)
         }
     }
     
@@ -190,34 +286,30 @@ struct RecordTabIcon: View {
     @State private var pulseAnimation = false
     
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                // Background circle with shadow effect
-                Circle()
-                    .fill(DeepRedDesign.Colors.accent)
-                    .frame(width: 36, height: 36)
-                    .shadow(
-                        color: DeepRedDesign.Colors.accent.opacity(0.3),
-                        radius: isSelected ? 8 : 4,
-                        x: 0,
-                        y: isSelected ? 4 : 2
-                    )
-                    .scaleEffect(isSelected ? 1.1 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
-                
-                // Record icon
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(DeepRedDesign.Colors.snow)
-                    .rotationEffect(.degrees(isSelected ? 45 : 0))
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
-            }
+        ZStack {
+            // Background circle with shadow effect
+            Circle()
+                .fill(DeepRedDesign.Colors.snow)
+                .frame(width: 44, height: 44)
+                .overlay(
+                    Circle()
+                        .stroke(DeepRedDesign.Colors.accent, lineWidth: 2)
+                )
+                .shadow(
+                    color: DeepRedDesign.Colors.accent.opacity(0.3),
+                    radius: isSelected ? 8 : 4,
+                    x: 0,
+                    y: isSelected ? 4 : 2
+                )
+                .scaleEffect(isSelected ? 1.1 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             
-            Text("Create")
-                .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+            // Record icon - centered
+            Image(systemName: "plus")
+                .font(.system(size: 32, weight: .bold))
                 .foregroundColor(DeepRedDesign.Colors.accent)
-                .opacity(isSelected ? 1.0 : 0.8)
-                .animation(.easeInOut(duration: 0.2), value: isSelected)
+                .rotationEffect(.degrees(isSelected ? 45 : 0))
+                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
         }
         .scaleEffect(pulseAnimation ? 1.05 : 1.0)
         .onAppear {
@@ -237,6 +329,10 @@ enum TabItem: String, CaseIterable {
     case record = "Create"
     case inbox = "Inbox"
     case profile = "Profile"
+    
+    var title: String {
+        return self.rawValue
+    }
     
     var icon: String {
         switch self {

@@ -125,18 +125,18 @@ struct HomeFeedView: View {
                     .transition(.opacity)
                 }
                 
-                // Floating Record Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        FloatingRecordButton {
-                            showCameraView = true
-                        }
-                        .padding(.trailing, DeepRedDesign.Spacing.screenMargin)
-                        .padding(.bottom, DeepRedDesign.Spacing.screenMargin) // Seamless positioning above tab bar
-                    }
-                }
+                // Floating Record Button - Hidden (now using tab bar record button)
+                // VStack {
+                //     Spacer()
+                //     HStack {
+                //         Spacer()
+                //         FloatingRecordButton {
+                //             showCameraView = true
+                //         }
+                //         .padding(.trailing, DeepRedDesign.Spacing.screenMargin)
+                //         .padding(.bottom, DeepRedDesign.Spacing.screenMargin) // Seamless positioning above tab bar
+                //     }
+                // }
                 
                 // Refresh Indicator Overlay
                 if isRefreshing {
@@ -159,11 +159,11 @@ struct HomeFeedView: View {
         .sheet(isPresented: $showNotifications) {
             NotificationsView()
         }
-        .fullScreenCover(isPresented: $showCameraView) {
-            CameraRecordingView(useBackCamera: false) {
-                // Camera will automatically dismiss when done
-            }
-        }
+        // .fullScreenCover(isPresented: $showCameraView) {
+        //     CameraRecordingView(useBackCamera: false) {
+        //         // Camera will automatically dismiss when done
+        //     }
+        // }
         .environmentObject(appState)
         .onChange(of: refreshTrigger) { _, _ in
             // Triggered by double-tap on home tab
